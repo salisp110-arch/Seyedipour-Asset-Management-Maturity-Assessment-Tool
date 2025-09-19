@@ -6,18 +6,33 @@ import pandas as pd
 import streamlit as st
 from pathlib import Path
 from datetime import datetime
+from typing import Optional
 
-# ---------- بررسی وجود plotly (برای جلوگیری از ModuleNotFound) ----------
-def _has_pkg(pkg, version=None):
+# ---------- بررسی وجود plotly (با امکان کنترل نسخه) ----------
+def _has_pkg(pkg: str, version: Optional[str] = None) -> bool:
     try:
-        __import__(pkg)
-        return True
+        mod = __import__(pkg)
+        if version is None:
+            return True
+        # مقایسهٔ نسخه در صورت نیاز
+        try:
+            from importlib.metadata import version as _v  # Python 3.8+ (backport در استریم‌لیت معمولاً موجود است)
+        except Exception:
+            try:
+                from pkg_resources import get_distribution as _gd
+                def _v(p): return _gd(p).version
+            except Exception:
+                return True  # اگر ابزار نسخه نبود، بیخیال مقایسه
+        cur = _v(pkg)
+        # مقایسهٔ ساده؛ اگر دقیقاً برابر باشد کافی است
+        return (cur == version)
     except Exception:
         return False
 
 if not _has_pkg("plotly", "5.22.0"):
-    st.error("برای اجرای داشبورد نیاز به بستهٔ plotly دارید. لطفاً نصب کنید: pip install plotly==5.22.0")
+    st.error("برای اجرای داشبورد نیاز به بستهٔ plotly دارید. لطفاً نصب کنید:  \n`pip install plotly==5.22.0`")
     st.stop()
+
 import plotly.graph_objects as go
 import plotly.express as px
 
@@ -64,7 +79,6 @@ h1,h2,h3,h4{ color:#16325c; }
 .kpi .value{ color:#0f3b8f; font-size:22px; font-weight:800; }
 .kpi .sub{ color:#6b7c93; font-size:12px; }
 
-/* پنل‌های آبی با گوشه‌گرد و سایه */
 .panel{
   background: linear-gradient(180deg,#f2f7ff 0%, #eaf3ff 100%);
   border:1px solid #d7e6ff; border-radius:16px; padding:16px 18px; margin:12px 0 18px 0;
@@ -72,7 +86,6 @@ h1,h2,h3,h4{ color:#16325c; }
 }
 .panel h3, .panel h4{ margin-top:0; color:#17407a; }
 
-/* جدول نگاشت کنار رادار */
 .mapping table{ font-size:12px; }
 .mapping .row_heading, .mapping .blank{ display:none; }
 
@@ -170,12 +183,19 @@ EMBEDDED_TOPICS = [
 if not TOPICS_PATH.exists():
     TOPICS_PATH.write_text(json.dumps(EMBEDDED_TOPICS, ensure_ascii=False, indent=2), encoding="utf-8")
 TOPICS = json.loads(TOPICS_PATH.read_text(encoding="utf-8"))
-if len(TOPICS)!=40:
+if len(TOPICS) != 40:
     st.warning("⚠️ تعداد موضوعات باید دقیقاً ۴۰ باشد.")
 
 # ---------- نقش‌ها و رنگ‌ها ----------
 ROLES = ["مدیران ارشد","مدیران اجرایی","سرپرستان / خبرگان","متخصصان فنی","متخصصان غیر فنی"]
-ROLE_COLORS = {"مدیران ارشد":"#d62728","مدیران اجرایی":"#1f77b4","سرپرستان / خبرگان":"#2ca02c","متخصصان فنی":"#ff7f0e","متخصصان غیر فنی":"#9467bd"}
+ROLE_COLORS = {
+    "مدیران ارشد":"#d62728",
+    "مدیران اجرایی":"#1f77b4",
+    "سرپرستان / خبرگان":"#2ca02c",
+    "متخصصان فنی":"#ff7f0e",
+    "متخصصان غیر فنی":"#9467bd",
+    "میانگین سازمان":"#111111"
+}
 
 # ---------- گزینه‌های پاسخ ----------
 LEVEL_OPTIONS = [
@@ -233,34 +253,45 @@ NORM_WEIGHTS = {
 }
 
 # ---------- کمک‌توابع ----------
-def ensure_company(company:str): (DATA_DIR/company).mkdir(parents=True, exist_ok=True)
-def load_company_df(company:str)->pd.DataFrame:
-    ensure_company(company); p=DATA_DIR/company/"responses.csv"
-    if p.exists(): return pd.read_csv(p)
-    cols=["timestamp","company","respondent","role"]
-    for t in TOPICS: cols += [f"t{t['id']}_maturity",f"t{t['id']}_rel",f"t{t['id']}_adj"]
+def ensure_company(company: str):
+    (DATA_DIR/company).mkdir(parents=True, exist_ok=True)
+
+def load_company_df(company: str) -> pd.DataFrame:
+    ensure_company(company)
+    p = DATA_DIR/company/"responses.csv"
+    if p.exists():
+        return pd.read_csv(p)
+    cols = ["timestamp","company","respondent","role"]
+    for t in TOPICS:
+        cols += [f"t{t['id']}_maturity",f"t{t['id']}_rel",f"t{t['id']}_adj"]
     return pd.DataFrame(columns=cols)
-def save_response(company:str, rec:dict):
-    df_old=load_company_df(company); df_new=pd.concat([df_old, pd.DataFrame([rec])], ignore_index=True)
+
+def save_response(company: str, rec: dict):
+    df_old = load_company_df(company)
+    df_new = pd.concat([df_old, pd.DataFrame([rec])], ignore_index=True)
     df_new.to_csv(DATA_DIR/company/"responses.csv", index=False)
 
 def _angles_deg_40():
-    base=np.arange(0,360,360/40.0); return (base+90)%360
+    base = np.arange(0,360,360/40.0); return (base+90) % 360
 
 def plot_radar(series_dict, tick_numbers, tick_mapping_df, target=45, annotate=False, height=900, point_size=7):
-    N=len(tick_numbers); angles=_angles_deg_40()
-    fig=go.Figure()
-    for label,vals in series_dict.items():
-        arr=list(vals)
-        if len(arr)!=N: arr=(arr+[None]*N)[:N]
+    N = len(tick_numbers); angles = _angles_deg_40()
+    fig = go.Figure()
+    for label, vals in series_dict.items():
+        arr = list(vals)
+        if len(arr) != N:
+            arr = (arr + [None]*N)[:N]
         fig.add_trace(go.Scatterpolar(
             r=arr+[arr[0]], theta=angles.tolist()+[angles[0]], thetaunit="degrees",
             mode="lines+markers"+("+text" if annotate else ""), name=label,
             text=[f"{v:.0f}" if v is not None else "" for v in arr+[arr[0]]] if annotate else None,
-            marker=dict(size=point_size, line=dict(width=1), color=ROLE_COLORS.get(label))))
+            marker=dict(size=point_size, line=dict(width=1), color=ROLE_COLORS.get(label))
+        ))
     # خط هدف
-    fig.add_trace(go.Scatterpolar(r=[target]*(N+1), theta=angles.tolist()+[angles[0]], thetaunit="degrees",
-        mode="lines", name=f"هدف {target}", line=dict(dash="dash",width=3,color="#444"), hoverinfo="skip"))
+    fig.add_trace(go.Scatterpolar(
+        r=[target]*(N+1), theta=angles.tolist()+[angles[0]], thetaunit="degrees",
+        mode="lines", name=f"هدف {target}", line=dict(dash="dash", width=3, color="#444"), hoverinfo="skip"
+    ))
     fig.update_layout(
         template=PLOTLY_TEMPLATE, font=dict(family="Vazir, Tahoma"),
         height=height,
@@ -276,14 +307,15 @@ def plot_radar(series_dict, tick_numbers, tick_mapping_df, target=45, annotate=F
         margin=dict(t=40,b=120,l=10,r=10)
     )
     c1, c2 = st.columns([3,2])
-    with c1: st.plotly_chart(fig, use_container_width=True)
+    with c1:
+        st.plotly_chart(fig, use_container_width=True)
     with c2:
         st.markdown("#### نگاشت شماره ↔ نام موضوع")
         st.dataframe(tick_mapping_df, use_container_width=True, height=min(700, 22*(len(tick_numbers)+2)))
 
 def plot_bars_multirole(per_role, labels, title, target=45, height=600):
-    fig=go.Figure()
-    for lab,vals in per_role.items():
+    fig = go.Figure()
+    for lab, vals in per_role.items():
         fig.add_trace(go.Bar(x=labels, y=vals, name=lab, marker_color=ROLE_COLORS.get(lab)))
     fig.update_layout(template=PLOTLY_TEMPLATE, font=dict(family="Vazir, Tahoma"),
         title=title, xaxis_title="موضوع", yaxis_title="نمره (0..100)",
@@ -308,8 +340,8 @@ def plot_bars_top_bottom(series, topic_names, top=10):
         st.plotly_chart(fig, use_container_width=True)
 
 def plot_lines_multirole(per_role, title, target=45):
-    x=[f"{i+1:02d}" for i in range(len(list(per_role.values())[0]))]; fig=go.Figure()
-    for lab,vals in per_role.items():
+    x = [f"{i+1:02d}" for i in range(len(list(per_role.values())[0]))]; fig = go.Figure()
+    for lab, vals in per_role.items():
         fig.add_trace(go.Scatter(x=x, y=vals, mode="lines+markers", name=lab, line=dict(width=2, color=ROLE_COLORS.get(lab))))
     fig.update_layout(template=PLOTLY_TEMPLATE, font=dict(family="Vazir, Tahoma"),
         title=title, xaxis_title="موضوع", yaxis_title="نمره (0..100)", paper_bgcolor="#ffffff", hovermode="x unified")
@@ -318,19 +350,21 @@ def plot_lines_multirole(per_role, title, target=45):
     fig.add_hline(y=target, line_dash="dash", line_color="red", annotation_text=f"هدف {target}")
     st.plotly_chart(fig, use_container_width=True)
 
-def org_weighted_topic(per_role_norm_fa, topic_id:int):
-    w=NORM_WEIGHTS.get(topic_id,{}); num=0.; den=0.
-    en2fa=ROLE_MAP_EN2FA
-    for en_key,weight in w.items():
-        fa=en2fa[en_key]; lst=per_role_norm_fa.get(fa,[]); idx=topic_id-1
-        if idx<len(lst) and pd.notna(lst[idx]): num+=weight*lst[idx]; den+=weight
-    return np.nan if den==0 else num/den
+def org_weighted_topic(per_role_norm_fa, topic_id: int):
+    w = NORM_WEIGHTS.get(topic_id, {}); num = 0.; den = 0.
+    en2fa = ROLE_MAP_EN2FA
+    for en_key, weight in w.items():
+        fa = en2fa[en_key]; lst = per_role_norm_fa.get(fa, []); idx = topic_id-1
+        if idx < len(lst) and pd.notna(lst[idx]):
+            num += weight * lst[idx]; den += weight
+    return np.nan if den == 0 else num/den
 
-def get_company_logo_path(company:str)->Path|None:
-    folder=DATA_DIR/company
+def get_company_logo_path(company: str) -> Optional[Path]:
+    folder = DATA_DIR / company
     for ext in ("png","jpg","jpeg"):
-        p=folder/f"logo.{ext}"
-        if p.exists(): return p
+        p = folder / f"logo.{ext}"
+        if p.exists():
+            return p
     return None
 
 # ---------- تب‌ها ----------
@@ -355,14 +389,14 @@ with tabs[0]:
             (ASSETS_DIR/"holding_logo.png").write_bytes(holding_logo_file.getbuffer())
             st.success("لوگوی هلدینگ به‌روزرسانی شد. صفحه را یک‌بار رفرش کنید.")
 
-    # باکس راهنما (متن اصلاح‌شده)
+    # باکس راهنما
     st.info("برای هر موضوع ابتدا توضیح فارسی آن را بخوانید، سپس با توجه به دو پرسش ذیل هر موضوع، یکی از گزینه‌های زیر هر پرسش را انتخاب بفرمایید.")
 
     company = st.text_input("نام شرکت")
     respondent = st.text_input("نام و نام خانوادگی (اختیاری)")
     role = st.selectbox("نقش / رده سازمانی", ROLES)
 
-    answers={}
+    answers = {}
     for t in TOPICS:
         st.markdown(f'''
         <div class="question-card">
@@ -377,17 +411,26 @@ with tabs[0]:
         answers[t['id']] = (m_choice, r_choice)
 
     if st.button("ثبت پاسخ"):
-        if not company: st.error("نام شرکت را وارد کنید.")
-        elif not role: st.error("نقش/رده سازمانی را انتخاب کنید.")
-        elif len(answers)!=len(TOPICS): st.error("لطفاً همهٔ ۴۰ موضوع را پاسخ دهید.")
+        if not company:
+            st.error("نام شرکت را وارد کنید.")
+        elif not role:
+            st.error("نقش/رده سازمانی را انتخاب کنید.")
+        elif len(answers) != len(TOPICS):
+            st.error("لطفاً همهٔ ۴۰ موضوع را پاسخ دهید.")
         else:
             ensure_company(company)
-            rec={"timestamp":datetime.now().isoformat(timespec="seconds"),"company":company,"respondent":respondent,"role":role}
+            rec = {"timestamp":datetime.now().isoformat(timespec="seconds"), "company":company, "respondent":respondent, "role":role}
+            m_map = dict(LEVEL_OPTIONS)
+            r_map = dict(REL_OPTIONS)
             for t in TOPICS:
-                m = dict(LEVEL_OPTIONS)[answers[t['id']][0]]
-                r = dict(REL_OPTIONS)[answers[t['id']][1]]
-                rec[f"t{t['id']}_maturity"]=m; rec[f"t{t['id']}_rel"]=r; rec[f"t{t['id']}_adj"]=m*r
-            save_response(company, rec); st.success("✅ پاسخ شما با موفقیت ذخیره شد.")
+                m_label, r_label = answers[t['id']]
+                m = m_map.get(m_label, 0)
+                r = r_map.get(r_label, 1)
+                rec[f"t{t['id']}_maturity"] = m
+                rec[f"t{t['id']}_rel"] = r
+                rec[f"t{t['id']}_adj"] = m * r
+            save_response(company, rec)
+            st.success("✅ پاسخ شما با موفقیت ذخیره شد.")
 
 # ======================= داشبورد =======================
 with tabs[1]:
@@ -397,7 +440,8 @@ with tabs[1]:
         st.error("دسترسی محدود است. رمز عبور درست را وارد کنید."); st.stop()
 
     companies = sorted([d.name for d in DATA_DIR.iterdir() if d.is_dir()])
-    if not companies: st.warning("هنوز هیچ پاسخی ثبت نشده است."); st.stop()
+    if not companies:
+        st.warning("هنوز هیچ پاسخی ثبت نشده است."); st.stop()
     company = st.selectbox("انتخاب شرکت", companies)
 
     colL, colH, colC = st.columns([1,1,6])
@@ -413,43 +457,58 @@ with tabs[1]:
         if comp_logo_path: st.image(str(comp_logo_path), width=90, caption=company)
 
     df = load_company_df(company)
-    if df.empty: st.warning("برای این شرکت پاسخی وجود ندارد."); st.stop()
+    if df.empty:
+        st.warning("برای این شرکت پاسخی وجود ندارد."); st.stop()
 
-    # نرمال‌سازی 0..100
+    # نرمال‌سازی 0..100 (با تبدیل عددیِ ایمن)
     for t in TOPICS:
-        c=f"t{t['id']}_adj"; df[c]=df[c].apply(lambda x: (x/40)*100 if pd.notna(x) else np.nan)
+        c = f"t{t['id']}_adj"
+        df[c] = pd.to_numeric(df[c], errors="coerce")
+        df[c] = df[c].apply(lambda x: (x/40)*100 if pd.notna(x) else np.nan)
 
     # میانگین نقش‌ها
-    role_means={}
+    role_means = {}
     for r in ROLES:
-        sub=df[df["role"]==r]
-        role_means[r]=[sub[f"t{t['id']}_adj"].mean() if not sub.empty else np.nan for t in TOPICS]
+        sub = df[df["role"]==r]
+        role_means[r] = [sub[f"t{t['id']}_adj"].mean() if not sub.empty else np.nan for t in TOPICS]
 
     # میانگین سازمان (وزن‌دهی فازی)
-    per_role_norm_fa={r:role_means[r] for r in ROLES}
-    org_series=[org_weighted_topic(per_role_norm_fa, t["id"]) for t in TOPICS]
+    per_role_norm_fa = {r: role_means[r] for r in ROLES}
+    org_series = [org_weighted_topic(per_role_norm_fa, t["id"]) for t in TOPICS]
 
-    # KPI
+    # KPI (ایمن در برابر NaN)
     st.markdown('<div class="panel">', unsafe_allow_html=True)
-    org_avg=float(np.nanmean(org_series)) if any(pd.notna(v) for v in org_series) else 0.0
-    pass_rate=np.mean([1 if (v>=TARGET) else 0 for v in org_series if pd.notna(v)])*100 if any(pd.notna(v) for v in org_series) else 0
-    simple_means=[np.nanmean([role_means[r][i] for r in ROLES if pd.notna(role_means[r][i])]) for i in range(40)]
-    best_idx=int(np.nanargmax(simple_means)) if np.isfinite(np.nanmax(simple_means)) else None
-    worst_idx=int(np.nanargmin(simple_means)) if np.isfinite(np.nanmin(simple_means)) else None
-    best_label=f"{best_idx+1:02d} — {TOPICS[best_idx]['name']}" if best_idx is not None else "-"
-    worst_label=f"{worst_idx+1:02d} — {TOPICS[worst_idx]['name']}" if worst_idx is not None else "-"
+    nanmean_org = np.nanmean(org_series)
+    org_avg = float(nanmean_org) if np.isfinite(nanmean_org) else 0.0
+    pass_rate = (np.mean([1 if (v >= TARGET) else 0 for v in org_series if pd.notna(v)]) * 100
+                 if any(pd.notna(v) for v in org_series) else 0)
+
+    simple_means = [
+        np.nanmean([role_means[r][i] for r in ROLES if pd.notna(role_means[r][i])])
+        for i in range(40)
+    ]
+    has_any = any(np.isfinite(x) for x in simple_means)
+    if has_any:
+        best_idx = int(np.nanargmax(simple_means))
+        worst_idx = int(np.nanargmin(simple_means))
+        best_label = f"{best_idx+1:02d} — {TOPICS[best_idx]['name']}"
+        worst_label = f"{worst_idx+1:02d} — {TOPICS[worst_idx]['name']}"
+    else:
+        best_label = "-"
+        worst_label = "-"
+
     k1,k2,k3,k4 = st.columns(4)
     k1.markdown(f"""<div class="kpi"><div class="title">میانگین سازمان (فازی)</div>
     <div class="value">{org_avg:.1f}</div><div class="sub">از 100</div></div>""", unsafe_allow_html=True)
     k2.markdown(f"""<div class="kpi"><div class="title">نرخ عبور از هدف</div>
-    <div class="value">{pass_rate:.0f}%</div><div class="sub">نقاط ≥ 45</div></div>""", unsafe_allow_html=True)
+    <div class="value">{pass_rate:.0f}%</div><div class="sub">نقاط ≥ {TARGET}</div></div>""", unsafe_allow_html=True)
     k3.markdown(f"""<div class="kpi"><div class="title">بهترین موضوع</div>
     <div class="value">{best_label}</div><div class="sub">میانگین ساده نقش‌ها</div></div>""", unsafe_allow_html=True)
     k4.markdown(f"""<div class="kpi"><div class="title">ضعیف‌ترین موضوع</div>
     <div class="value">{worst_label}</div><div class="sub">میانگین ساده نقش‌ها</div></div>""", unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # فیلترها/تنظیمات نمایش (بدون سایدبار)
+    # فیلترها/تنظیمات نمایش
     st.markdown('<div class="panel"><h4>فیلترها و تنظیمات نمایش</h4>', unsafe_allow_html=True)
     annotate_radar = st.checkbox("نمایش اعداد روی نقاط رادار", value=False)
     col_sz1, col_sz2 = st.columns(2)
@@ -470,7 +529,7 @@ with tabs[1]:
                   else (names_short if label_mode=="نام کوتاه" else names_full)
     tick_numbers = [f"{i+idx0+1:02d}" for i,_ in enumerate(topics_slice)]
     tick_mapping_df = pd.DataFrame({"شماره":tick_numbers, "نام موضوع":names_full})
-    role_means_filtered={r: role_means[r][idx0:idx1] for r in roles_selected}
+    role_means_filtered = {r: role_means[r][idx0:idx1] for r in roles_selected}
     org_series_slice = org_series[idx0:idx1]
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -491,7 +550,7 @@ with tabs[1]:
 
     # میله‌ای گروهی (نقش‌ها)
     st.markdown('<div class="panel"><h4>نمودار میله‌ای گروهی (نقش‌ها)</h4>', unsafe_allow_html=True)
-    plot_bars_multirole({r:role_means[r][idx0:idx1] for r in roles_selected},
+    plot_bars_multirole({r: role_means[r][idx0:idx1] for r in roles_selected},
                         labels_bar, "مقایسه رده‌ها (0..100)", target=TARGET, height=bar_height)
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -503,7 +562,7 @@ with tabs[1]:
     # Heatmap و Boxplot
     st.markdown('<div class="panel"><h4>Heatmap و Boxplot</h4>', unsafe_allow_html=True)
     heat_df = pd.DataFrame({"موضوع":labels_bar})
-    for r in roles_selected: heat_df[r]=role_means[r][idx0:idx1]
+    for r in roles_selected: heat_df[r] = role_means[r][idx0:idx1]
     hm = heat_df.melt(id_vars="موضوع", var_name="نقش", value_name="امتیاز")
     fig_heat = px.density_heatmap(hm, x="نقش", y="موضوع", z="امتیاز",
                                   color_continuous_scale="RdYlGn", height=560, template=PLOTLY_TEMPLATE)
