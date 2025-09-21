@@ -7,6 +7,8 @@ import streamlit as st
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
+from textwrap import dedent
+import streamlit.components.v1 as components
 
 # ---------------- Page config ----------------
 st.set_page_config(page_title="پرسشنامه و داشبورد مدیریت دارایی", layout="wide")
@@ -44,61 +46,64 @@ def _safe_dir(p: Path) -> Path:
 DATA_DIR   = _safe_dir(BASE / "data")     # اگر فایل با نام data بود، به _data_dir می‌رود
 ASSETS_DIR = _safe_dir(BASE / "assets")
 
-# ---------------- استایل و فونت وزیر (بدون <style> تودرتو) ----------------
-st.markdown("""
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/font-face.css">
-<style>
-:root{ --app-font: Vazir, Tahoma, Arial, sans-serif; }
-html, body, * { font-family: var(--app-font) !important; direction: rtl; }
-.block-container{ padding-top: .6rem; padding-bottom: 3rem; }
-h1,h2,h3,h4{ color:#16325c; }
+# ---------------- تزریق قطعی CSS (دیگر به‌صورت متن چاپ نمی‌شود) ----------------
+def inject_global_css():
+    html_css = dedent("""
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/font-face.css">
+    <style>
+    :root{ --app-font: Vazir, Tahoma, Arial, sans-serif; }
+    html, body, * { font-family: var(--app-font) !important; direction: rtl; }
+    .block-container{ padding-top: .6rem; padding-bottom: 3rem; }
+    h1,h2,h3,h4{ color:#16325c; }
 
-/* هدر چسبنده */
-.header-sticky{
-  position: sticky; top: 0; z-index: 999;
-  background: #ffffffcc; backdrop-filter: blur(6px);
-  border-bottom: 1px solid #eef2f7; padding: 8px 12px; margin: -10px -1rem 10px -1rem;
-}
-.header-sticky .wrap{ display:flex; align-items:center; gap:12px; }
-.header-sticky .title{ font-weight:800; color:#16325c; font-size:18px; margin:0; }
+    /* هدر چسبنده */
+    .header-sticky{
+      position: sticky; top: 0; z-index: 999;
+      background: #ffffffcc; backdrop-filter: blur(6px);
+      border-bottom: 1px solid #eef2f7; padding: 8px 12px; margin: -10px -1rem 10px -1rem;
+    }
+    .header-sticky .wrap{ display:flex; align-items:center; gap:12px; }
+    .header-sticky .title{ font-weight:800; color:#16325c; font-size:18px; margin:0; }
 
-/* کارت سوال */
-.question-card{
-  background: rgba(255,255,255,0.78); backdrop-filter: blur(6px);
-  padding: 16px 18px; margin: 10px 0 16px 0; border-radius: 14px;
-  border: 1px solid #e8eef7; box-shadow: 0 6px 16px rgba(36,74,143,0.08), inset 0 1px 0 rgba(255,255,255,0.7);
-}
-.q-head{ font-weight:800; color:#16325c; font-size:15px; margin-bottom:8px; }
-.q-desc{ color:#222; font-size:14px; line-height:1.9; margin-bottom:10px; }
-.q-num{ display:inline-block; background:#e8f0fe; color:#16325c; font-weight:700; border-radius:8px; padding:2px 8px; margin-left:6px; font-size:12px;}
-.q-question{ color:#0f3b8f; font-weight:700; margin:.2rem 0 .4rem 0; }
+    /* کارت سوال */
+    .question-card{
+      background: rgba(255,255,255,0.78); backdrop-filter: blur(6px);
+      padding: 16px 18px; margin: 10px 0 16px 0; border-radius: 14px;
+      border: 1px solid #e8eef7; box-shadow: 0 6px 16px rgba(36,74,143,0.08), inset 0 1px 0 rgba(255,255,255,0.7);
+    }
+    .q-head{ font-weight:800; color:#16325c; font-size:15px; margin-bottom:8px; }
+    .q-desc{ color:#222; font-size:14px; line-height:1.9; margin-bottom:10px; }
+    .q-num{ display:inline-block; background:#e8f0fe; color:#16325c; font-weight:700; border-radius:8px; padding:2px 8px; margin-left:6px; font-size:12px;}
+    .q-question{ color:#0f3b8f; font-weight:700; margin:.2rem 0 .4rem 0; }
 
-/* KPI */
-.kpi{
-  border-radius:14px; padding:16px 18px; border:1px solid #e6ecf5;
-  background:linear-gradient(180deg,#ffffff 0%,#f6f9ff 100%); box-shadow:0 8px 20px rgba(0,0,0,0.05);
-  min-height:96px;
-}
+    /* KPI */
+    .kpi{
+      border-radius:14px; padding:16px 18px; border:1px solid #e6ecf5;
+      background:linear-gradient(180deg,#ffffff 0%,#f6f9ff 100%); box-shadow:0 8px 20px rgba(0,0,0,0.05);
+      min-height:96px;
+    }
+    .kpi .title{ color:#456; font-size:13px; margin-bottom:6px; }
+    .kpi .value{ color:#0f3b8f; font-size:22px; font-weight:800; }
+    .kpi .sub{ color:#6b7c93; font-size:12px; }
 
-.kpi .title{ color:#456; font-size:13px; margin-bottom:6px; }
-.kpi .value{ color:#0f3b8f; font-size:22px; font-weight:800; }
-.kpi .sub{ color:#6b7c93; font-size:12px; }
+    /* پنل */
+    .panel{
+      background: linear-gradient(180deg,#f2f7ff 0%, #eaf3ff 100%);
+      border:1px solid #d7e6ff; border-radius:16px; padding:16px 18px; margin:12px 0 18px 0;
+      box-shadow: 0 10px 24px rgba(31,79,176,.12), inset 0 1px 0 rgba(255,255,255,.8);
+    }
+    .panel h3, .panel h4{ margin-top:0; color:#17407a; }
 
-/* پنل */
-.panel{
-  background: linear-gradient(180deg,#f2f7ff 0%, #eaf3ff 100%);
-  border:1px solid #d7e6ff; border-radius:16px; padding:16px 18px; margin:12px 0 18px 0;
-  box-shadow: 0 10px 24px rgba(31,79,176,.12), inset 0 1px 0 rgba(255,255,255,.8);
-}
-.panel h3, .panel h4{ margin-top:0; color:#17407a; }
+    /* جدول نگاشت کنار رادار */
+    .mapping table{ font-size:12px; }
+    .mapping .row_heading, .mapping .blank{ display:none; }
 
-/* جدول نگاشت کنار رادار */
-.mapping table{ font-size:12px; }
-.mapping .row_heading, .mapping .blank{ display:none; }
+    .stTabs [role="tab"]{ direction: rtl; }
+    </style>
+    """)
+    components.html(html_css, height=0)
 
-.stTabs [role="tab"]{ direction: rtl; }
-</style>
-""", unsafe_allow_html=True)
+inject_global_css()
 
 PLOTLY_TEMPLATE = "plotly_white"
 TARGET = 45  # 🎯
@@ -158,7 +163,7 @@ EMBEDDED_TOPICS = [
      "desc":"به‌کارگیری اصول/تکنیک‌های قابلیت اطمینان در سراسر چرخه عمر (RCM, FMECA, تحلیل خرابی، افزونگی) برای کاهش ریسک خرابی."},
     {"id":26, "name":"عملیات دارایی",
      "desc":"سیاست‌ها/فرآیندهای بهره‌برداری برای سطح خدمت با رعایت HSE، قابلیت اطمینان و عملکرد مالی؛ توجه به خطای انسانی، اتوماسیون و پایش."},
-    {"id":27, "name":"اجرای نگهداری",
+    {"id":27, "name":"اجرا‌ی نگهداری",
      "desc":"مدیریت برنامه‌ریزی، زمان‌بندی، اجرا و تحلیل نگهداری؛ بازرسی/پایش وضعیت، PM، CM و استفاده از EAMS و روش‌های پیش‌بینانه."},
     {"id":28, "name":"مدیریت و پاسخ به رخدادها",
      "desc":"تشخیص، تحلیل، اقدام اصلاحی و بازیابی پس از خرابی‌ها/حوادث؛ FRACAS، RCA، 5Why، ایشیکاوا؛ سازوکار واکنش سریع متناسب با ریسک."},
@@ -185,7 +190,7 @@ EMBEDDED_TOPICS = [
     {"id":39, "name":"مدیریت تغییر",
      "desc":"سیستمی برای شناسایی، ارزیابی، اجرا و اطلاع‌رسانی تغییرات ناشی از قوانین جدید، فناوری نو، تغییرات کارکنان یا شرایط بحرانی."},
     {"id":40, "name":"نتایج و پیامدها",
-     "desc":"ترکیبی از خروجی‌ها و اثرات کوتاه/بلندمدت مالی/غیرمالی؛ چارچوب‌های Value Framework و 6 Capitals برای سنجش ارزش به‌کار می‌روند."}
+     "desc":"ترکیبی از خروجی‌ها و اثرات کوتاه/بلندمدت مالی/غیرف مالی؛ چارچوب‌های Value Framework و 6 Capitals برای سنجش ارزش به‌کار می‌روند."}
 ]
 if not TOPICS_PATH.exists():
     TOPICS_PATH.write_text(json.dumps(EMBEDDED_TOPICS, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -284,6 +289,21 @@ def get_company_logo_path(company: str) -> Optional[Path]:
         if p.exists():
             return p
     return None
+
+def companies_with_responses() -> list[str]:
+    return sorted([d.name for d in DATA_DIR.iterdir() if d.is_dir() and (DATA_DIR/d.name/"responses.csv").exists()])
+
+def build_participation_summary_df() -> pd.DataFrame:
+    rows = []
+    for name in companies_with_responses():
+        df = load_company_df(name)
+        total = len(df)
+        counts = df["role"].value_counts()
+        row = {"شرکت": _sanitize_company_name(name), "کل": int(total)}
+        for r in ROLES:
+            row[r] = int(counts.get(r, 0))
+        rows.append(row)
+    return pd.DataFrame(rows).sort_values(["کل","شرکت"], ascending=[False, True]) if rows else pd.DataFrame(columns=["شرکت","کل"]+ROLES)
 
 # ---------------- توابع رسم ----------------
 def _angles_deg_40():
@@ -459,28 +479,55 @@ with tabs[1]:
         st.warning("رمز درست را وارد کنید.")
         st.stop()
 
-    # فقط شرکت‌هایی که فایل responses.csv دارند
-    companies = sorted([d.name for d in DATA_DIR.iterdir() if d.is_dir() and (DATA_DIR/d.name/"responses.csv").exists()])
+    companies = companies_with_responses()
     if not companies:
         st.info("هنوز هیچ پاسخی ثبت نشده است.")
         st.stop()
 
+    # ---------- پنل جدید: خلاصه مشارکت همه شرکت‌ها ----------
+    st.markdown('<div class="panel"><h4>خلاصه مشارکت همهٔ شرکت‌ها</h4>', unsafe_allow_html=True)
+    summary_df = build_participation_summary_df()
+    try:
+        st.dataframe(summary_df, use_container_width=True, hide_index=True)
+    except TypeError:
+        st.dataframe(summary_df.set_index("شرکت"), use_container_width=True)
+
+    # نمودار پشته‌ای تعداد پاسخ‌دهندگان به تفکیک رده برای هر شرکت
+    if not summary_df.empty and summary_df.shape[0] > 0:
+        melt_df = summary_df.melt(id_vars=["شرکت","کل"], value_vars=ROLES, var_name="رده", value_name="تعداد")
+        fig_part = px.bar(
+            melt_df, x="شرکت", y="تعداد", color="رده", template=PLOTLY_TEMPLATE,
+            title="تعداد پاسخ‌دهندگان به تفکیک رده سازمانی در هر شرکت",
+            barmode="stack", color_discrete_map=ROLE_COLORS, height=450
+        )
+        st.plotly_chart(fig_part, use_container_width=True)
+
+        st.download_button(
+            "⬇️ دانلود CSV خلاصه مشارکت همهٔ شرکت‌ها",
+            data=summary_df.to_csv(index=False).encode("utf-8-sig"),
+            file_name="companies_participation_summary.csv",
+            mime="text/csv"
+        )
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # ---------- انتخاب شرکت و ادامهٔ تحلیل ----------
     company = st.selectbox("انتخاب شرکت", companies)
     df = load_company_df(company)
     if df.empty:
         st.info("برای این شرکت پاسخی وجود ندارد.")
         st.stop()
 
-    # خلاصه مشارکت در ابتدای داشبورد (چند نفر و در چه رده‌ای)
+    # خلاصه مشارکت شرکت انتخاب‌شده
     st.markdown('<div class="panel"><h4>خلاصه مشارکت شرکت</h4>', unsafe_allow_html=True)
     total_n = len(df)
     st.markdown(f"**{_sanitize_company_name(company)}** — تعداد کل پاسخ‌ها: **{total_n}**")
 
     role_counts = df["role"].value_counts().reindex(ROLES).fillna(0).astype(int)
     rc_df = pd.DataFrame({"نقش/رده": role_counts.index, "تعداد پاسخ‌ها": role_counts.values})
-    st.dataframe(rc_df, use_container_width=True, hide_index=True)
-
-    # نمودار میله‌ای تعداد پاسخ‌دهندگان به تفکیک نقش
+    try:
+        st.dataframe(rc_df, use_container_width=True, hide_index=True)
+    except TypeError:
+        st.dataframe(rc_df.set_index("نقش/رده"), use_container_width=True)
     fig_cnt = px.bar(rc_df, x="نقش/رده", y="تعداد پاسخ‌ها", template=PLOTLY_TEMPLATE, title="تعداد پاسخ‌دهندگان به تفکیک رده سازمانی")
     st.plotly_chart(fig_cnt, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
@@ -649,5 +696,3 @@ with tabs[1]:
                        file_name=f"{_sanitize_company_name(company)}_responses.csv", mime="text/csv")
     st.caption("برای دانلود تصویر نمودارها، می‌توانید بستهٔ اختیاری `kaleido` را نصب کنید.")
     st.markdown('</div>', unsafe_allow_html=True)
-
-
