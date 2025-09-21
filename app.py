@@ -411,7 +411,7 @@ with tabs[0]:
         st.markdown(f'''
         <div class="question-card">
           <div class="q-head"><span class="q-num">{t["id"]:02d}</span>{t["name"]}</div>
-          <div class="q-desc">{t["desc"].replace("\n","<br>")}</div>
+          <div class="q-desc">{t["desc"].replace("\\n","<br>")}</div>
         </div>
         ''', unsafe_allow_html=True)
         st.markdown(f'<div class="q-question">۱) به نظر شما، موضوع «{t["name"]}» در سازمان شما در چه سطحی قرار دارد؟</div>', unsafe_allow_html=True)
@@ -455,7 +455,7 @@ with tabs[1]:
                 import importlib.metadata as md
                 st.write("نسخهٔ Plotly:", md.version("plotly"))
             except Exception:
-                pass)
+                pass  # ← ← همین خط قبلاً یک ')' اضافه داشت
         st.caption("اگر Plotly نصب نبود، در requirements.txt خط «plotly==5.22.0» را اضافه کنید و دوباره Deploy کنید.")
 
     password = st.text_input("🔑 رمز عبور داشبورد را وارد کنید", type="password")
