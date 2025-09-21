@@ -43,8 +43,8 @@ def inject_css():
     css = """
 :root{
   --brand:#16325c; --accent:#0f3b8f; --border:#e8eef7; --font:Vazir,Tahoma,Arial,sans-serif;
-  /* ارتفاع هدر ثابت + فضای اضافه تا عنوان‌ها زیرش قایم نشن */
-  --topbar-h: 184px;
+  /* ارتفاع هدر ثابت + فضای اضافه؛ قبلاً 184px بود، الان دقیقاً دو برابرش */
+  --topbar-h: 368px;
 }
 html,body,*{font-family:var(--font)!important;direction:rtl}
 .block-container{padding-top:var(--topbar-h); padding-bottom:3rem}
@@ -560,3 +560,4 @@ with tab_dash:
 if st.session_state.get("view_choice") == "📊 داشبورد":
     st.markdown("---")
     render_dashboard()
+
