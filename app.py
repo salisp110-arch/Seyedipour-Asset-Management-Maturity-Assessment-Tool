@@ -95,7 +95,6 @@ h1,h2,h3,h4{ color:#16325c; }
 /* جدول نگاشت کنار رادار */
 .mapping table{ font-size:12px; }
 .mapping .row_heading, .mapping .blank{ display:none; }
-<style>
 
 .stTabs [role="tab"]{ direction: rtl; }
 </style>
@@ -650,4 +649,5 @@ with tabs[1]:
                        file_name=f"{_sanitize_company_name(company)}_responses.csv", mime="text/csv")
     st.caption("برای دانلود تصویر نمودارها، می‌توانید بستهٔ اختیاری `kaleido` را نصب کنید.")
     st.markdown('</div>', unsafe_allow_html=True)
+
 
