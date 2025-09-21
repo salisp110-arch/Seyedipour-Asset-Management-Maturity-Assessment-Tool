@@ -9,7 +9,10 @@ from datetime import datetime
 from typing import Optional
 
 # ---------------- Page config ----------------
-st.set_page_config(page_title="پرسشنامه و داشبورد مدیریت دارایی", layout="wide")
+st.set_page_config(
+    page_title="پرسشنامه و داشبورد تعیین سطح بلوغ سازمان‌ها در مدیریت دارایی فیزیکی",
+    layout="wide"
+)
 
 # ---------------- Plotly (برای داشبورد لازم) ----------------
 try:
@@ -43,85 +46,52 @@ def _safe_dir(p: Path) -> Path:
 DATA_DIR   = _safe_dir(BASE / "data")
 ASSETS_DIR = _safe_dir(BASE / "assets")
 
-# ---------------- CSS/Font: تزریق امن + نوار ثابت پایین‌تر از هدر استریم‌لیت ----------------
-def inject_css():
+# ---------------- CSS/Font: تزریق امن بدون نمایش متن خام ----------------
+def inject_css_safe():
+    if st.session_state.get("_css_ok"):
+        return
     css = """
-:root{
-  --brand:#16325c; --accent:#0f3b8f; --border:#e8eef7; --font:Vazir,Tahoma,Arial,sans-serif;
-  /* فاصله از بالای صفحه تا شروع نوار ثابت (زیر هدر پیش‌فرض استریم‌لیت) */
-  --top-offset: 64px;
-  /* ارتفاع لوگو و ارتفاع نوار ثابت */
-  --logo-h: 96px;
-  --topbar-h: 132px; /* ارتفاع واقعی با متن/پدینگ */
-}
-/* راست‌به‌چپ + فونت وزیر در کل صفحه */
+:root{--brand:#16325c;--accent:#0f3b8f;--border:#e8eef7;--font:Vazir,Tahoma,Arial,sans-serif}
 html,body,*{font-family:var(--font)!important;direction:rtl}
-.block-container{padding-top: calc(var(--top-offset) + var(--topbar-h) + 16px); padding-bottom:3rem}
+.block-container{padding-top:.6rem;padding-bottom:3rem}
 h1,h2,h3,h4{color:var(--brand)}
-
-/* نوار ثابت عنوان + لوگو (زیر هدر استریم‌لیت) */
-.app-topbar{
-  position: fixed;
-  top: var(--top-offset);
-  left: 0; right: 0;
-  z-index: 1000;
-  background: rgba(255,255,255,.97);
-  backdrop-filter: blur(6px);
-  border-bottom: 1px solid #e7eef6;
-  padding: 14px 18px;
-  box-shadow: 0 2px 10px rgba(0,0,0,.05);
-}
-.app-topbar .wrap{display:flex;align-items:center;gap:18px}
-.app-topbar .title{
-  margin: 0; font-weight: 800; color: var(--brand);
-  font-size: 22px; line-height: 1.25;
-}
-
-/* کارت‌های پرسش */
-.question-card{
-  background:#fff; border:1px solid var(--border); border-radius:14px;
-  padding:16px 18px; margin:10px 0 16px;
-  box-shadow:0 6px 16px rgba(36,74,143,.06), inset 0 1px 0 rgba(255,255,255,.6)
-}
+/* نوار ثابت بالا با آفست امن */
+.app-topbar{position:sticky;top:48px;z-index:999;background:#ffffffd9;backdrop-filter:blur(6px);
+  border:1px solid #eef2f7;border-radius:14px;padding:10px 14px;margin:0 0 12px 0;box-shadow:0 6px 18px rgba(0,0,0,.06)}
+.app-topbar .wrap{display:flex;align-items:center;gap:14px}
+.app-topbar .title{font-weight:800;color:var(--brand);font-size:18px;margin:0}
+/* کارت سوال */
+.question-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin:10px 0 16px;box-shadow:0 6px 16px rgba(36,74,143,.06),inset 0 1px 0 rgba(255,255,255,.6)}
 .q-head{font-weight:800;color:var(--brand);font-size:15px;margin-bottom:8px}
 .q-desc{color:#222;font-size:14px;line-height:1.9;margin-bottom:10px;text-align:justify}
 .q-num{display:inline-block;background:#e8f0fe;color:var(--brand);font-weight:700;border-radius:8px;padding:2px 8px;margin-left:6px;font-size:12px}
 .q-question{color:var(--accent);font-weight:700;margin:.2rem 0 .4rem}
-
 /* KPI */
-.kpi{
-  border-radius:14px; padding:16px 18px; border:1px solid #e6ecf5;
-  background:linear-gradient(180deg,#fff 0%,#f6f9ff 100%); box-shadow:0 8px 20px rgba(0,0,0,.05);
-  min-height:96px
-}
+.kpi{border-radius:14px;padding:16px 18px;border:1px solid #e6ecf5;background:linear-gradient(180deg,#fff 0%,#f6f9ff 100%);
+  box-shadow:0 8px 20px rgba(0,0,0,.05);min-height:96px}
 .kpi .title{color:#456;font-size:13px;margin-bottom:6px}
 .kpi .value{color:var(--accent);font-size:22px;font-weight:800}
 .kpi .sub{color:#6b7c93;font-size:12px}
-
-/* پنل‌های داشبورد */
-.panel{
-  background:linear-gradient(180deg,#f2f7ff 0%,#eaf3ff 100%);
-  border:1px solid #d7e6ff; border-radius:16px; padding:16px 18px; margin:12px 0 18px 0;
-  box-shadow:0 10px 24px rgba(31,79,176,.1), inset 0 1px 0 rgba(255,255,255,.8)
-}
+/* پنل */
+.panel{background:linear-gradient(180deg,#f2f7ff 0%,#eaf3ff 100%);border:1px solid #d7e6ff;border-radius:16px;padding:16px 18px;margin:12px 0 18px 0;
+  box-shadow:0 10px 24px rgba(31,79,176,.1),inset 0 1px 0 rgba(255,255,255,.8)}
 .panel h3,.panel h4{margin-top:0;color:#17407a}
-
-/* جدول کنار رادار و تب‌ها */
+/* جدول کنار رادار */
 .mapping table{font-size:12px}
 .mapping .row_heading,.mapping .blank{display:none}
-.stTabs [role="tab"]{direction:rtl}
+/* تب‌ها RTL */
+.stTabs [role=tab]{direction:rtl}
 """
-    b64 = base64.b64encode(css.encode("utf-8")).decode()
-    st.markdown(
-        f"""
+    b64css = base64.b64encode(css.encode("utf-8")).decode()
+    html = f"""
 <link rel="stylesheet"
       href="https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/font-face.css">
-<link rel="stylesheet" href="data:text/css;base64,{b64}">
-""",
-        unsafe_allow_html=True
-    )
+<link rel="stylesheet" href="data:text/css;base64,{b64css}">
+"""
+    st.markdown(html, unsafe_allow_html=True)
+    st.session_state["_css_ok"] = True
 
-inject_css()
+inject_css_safe()
 
 PLOTLY_TEMPLATE = "plotly_white"
 TARGET = 45  # 🎯
@@ -324,7 +294,7 @@ def plot_bars_multirole(per_role, labels, title, target=45, height=600):
         margin=dict(t=40,b=120,l=10,r=10), paper_bgcolor="#ffffff", height=height)
     fig.add_shape(type="rect", xref="paper", yref="y", x0=0, x1=1, y0=target-5, y1=target+5,
                   fillcolor="rgba(255,0,0,0.06)", line_width=0)
-    fig.add_hline(y=target, line_dash="dash", line_color="red", annotation_text=f"هدف {TARGET}")
+    fig.add_hline(y=target, line_dash="dash", line_color="red", annotation_text=f"هدف {target}")
     st.plotly_chart(fig, use_container_width=True)
 
 def plot_bars_top_bottom(series, topic_names, top=10):
@@ -338,6 +308,17 @@ def plot_bars_top_bottom(series, topic_names, top=10):
     with colB:
         fig = px.bar(bot_s[::-1], orientation="h", template=PLOTLY_TEMPLATE, title=f"Bottom {top} (میانگین سازمان)")
         st.plotly_chart(fig, use_container_width=True)
+
+def plot_lines_multirole(per_role, title, target=45):
+    x = [f"{i+1:02d}" for i in range(len(list(per_role.values())[0]))]; fig = go.Figure()
+    for lab, vals in per_role.items():
+        fig.add_trace(go.Scatter(x=x, y=vals, mode="lines+markers", name=lab, line=dict(width=2, color=ROLE_COLORS.get(lab))))
+    fig.update_layout(template=PLOTLY_TEMPLATE, font=dict(family="Vazir, Tahoma"),
+        title=title, xaxis_title="موضوع", yaxis_title="نمره (0..100)", paper_bgcolor="#ffffff", hovermode="x unified")
+    fig.add_shape(type="rect", xref="paper", yref="y", x0=0, x1=1, y0=target-5, y1=target+5,
+                  fillcolor="rgba(255,0,0,0.06)", line_width=0)
+    fig.add_hline(y=target, line_dash="dash", line_color="red", annotation_text=f"هدف {target}")
+    st.plotly_chart(fig, use_container_width=True)
 
 def org_weighted_topic(per_role_norm_fa, topic_id: int):
     w = NORM_WEIGHTS.get(topic_id, {}); num = 0.; den = 0.
@@ -361,7 +342,7 @@ def render_topbar():
 <div class="app-topbar">
   <div class="wrap">
     {_logo_html(ASSETS_DIR, "holding_logo.png", 96)}
-    <div class="title">پرسشنامه و داشبورد بلوغ مدیریت دارایی فیزیکی</div>
+    <div class="title">پرسشنامه و داشبورد تعیین سطح بلوغ سازمان‌ها در مدیریت دارایی فیزیکی</div>
   </div>
 </div>
 """,
@@ -376,19 +357,16 @@ def reset_survey_state():
     for k in ["company_input", "respondent_input", "role_select"]:
         st.session_state.pop(k, None)
 
-# ===== نوار ثابت (جهانی) =====
-render_topbar()
-
 # ---------------- تب‌ها ----------------
 tabs = st.tabs(["📝 پرسشنامه","📊 داشبورد"])
 
 # ======================= پرسشنامه =======================
 with tabs[0]:
-    # پیام موفقیت بعد از ریست
+    render_topbar()
+
     if st.session_state.pop("submitted_ok", False):
         st.success("✅ پاسخ شما با موفقیت ذخیره شد و فرم ریست شد.")
 
-    # برندینگ هلدینگ
     with st.expander("⚙️ برندینگ هلدینگ (اختیاری)"):
         holding_logo_file = st.file_uploader("لوگوی هلدینگ انرژی گستر سینا", type=["png","jpg","jpeg"], key="upl_holding_logo")
         if holding_logo_file:
@@ -444,6 +422,8 @@ with tabs[0]:
 
 # ======================= داشبورد =======================
 with tabs[1]:
+    render_topbar()
+
     st.subheader("📊 داشبورد نتایج")
 
     if not PLOTLY_OK:
@@ -466,10 +446,10 @@ with tabs[1]:
         st.info("برای این شرکت پاسخی وجود ندارد.")
         st.stop()
 
-    # خلاصه مشارکت
     st.markdown('<div class="panel"><h4>خلاصه مشارکت شرکت</h4>', unsafe_allow_html=True)
     total_n = len(df)
     st.markdown(f"**{_sanitize_company_name(company)}** — تعداد کل پاسخ‌ها: **{total_n}**")
+
     role_counts = df["role"].value_counts().reindex(ROLES).fillna(0).astype(int)
     rc_df = pd.DataFrame({"نقش/رده": role_counts.index, "تعداد پاسخ‌ها": role_counts.values})
     st.dataframe(rc_df, use_container_width=True, hide_index=True)
@@ -477,11 +457,10 @@ with tabs[1]:
     st.plotly_chart(fig_cnt, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # لوگوها
     colL, colH, colC = st.columns([1,1,6])
     with colH:
         if (ASSETS_DIR/"holding_logo.png").exists():
-            st.image(str(ASSETS_DIR/"holding_logo.png"), width=110, caption="هلدینگ")
+            st.image(str(ASSETS_DIR/"holding_logo.png"), width=90, caption="هلدینگ")
     with colL:
         st.caption("لوگوی شرکت:")
         comp_logo_file = st.file_uploader("آپلود/به‌روزرسانی لوگو", key="uplogo", type=["png","jpg","jpeg"])
@@ -491,32 +470,29 @@ with tabs[1]:
             st.rerun()
         comp_logo_path = get_company_logo_path(company)
         if comp_logo_path:
-            st.image(str(comp_logo_path), width=110, caption=company)
+            st.image(str(comp_logo_path), width=90, caption=company)
 
-    # نرمال‌سازی 0..100
     for t in TOPICS:
         c = f"t{t['id']}_adj"
         df[c] = pd.to_numeric(df[c], errors="coerce")
         df[c] = df[c].apply(lambda x: (x/40)*100 if pd.notna(x) else np.nan)
 
-    # میانگین نقش‌ها
     role_means = {}
     for r in ROLES:
         sub = df[df["role"]==r]
         role_means[r] = [sub[f"t{t['id']}_adj"].mean() if not sub.empty else np.nan for t in TOPICS]
 
-    # میانگین سازمان (وزن‌دهی فازی)
     per_role_norm_fa = {r: role_means[r] for r in ROLES}
     org_series = [org_weighted_topic(per_role_norm_fa, t["id"]) for t in TOPICS]
 
-    # KPI
     st.markdown('<div class="panel">', unsafe_allow_html=True)
     nanmean_org = np.nanmean(org_series)
     org_avg = float(nanmean_org) if np.isfinite(nanmean_org) else 0.0
     pass_rate = (np.mean([1 if (v >= TARGET) else 0 for v in org_series if pd.notna(v)]) * 100
                  if any(pd.notna(v) for v in org_series) else 0)
     simple_means = [np.nanmean([role_means[r][i] for r in ROLES if pd.notna(role_means[r][i])]) for i in range(40)]
-    if any(np.isfinite(x) for x in simple_means):
+    has_any = any(np.isfinite(x) for x in simple_means)
+    if has_any:
         best_idx = int(np.nanargmax(simple_means)); worst_idx = int(np.nanargmin(simple_means))
         best_label = f"{best_idx+1:02d} — {TOPICS[best_idx]['name']}"
         worst_label = f"{worst_idx+1:02d} — {TOPICS[worst_idx]['name']}"
@@ -534,7 +510,6 @@ with tabs[1]:
     <div class="value">{worst_label}</div><div class="sub">میانگین ساده نقش‌ها</div></div>""", unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # فیلترها/تنظیمات نمایش
     st.markdown('<div class="panel"><h4>فیلترها و تنظیمات نمایش</h4>', unsafe_allow_html=True)
     annotate_radar = st.checkbox("نمایش اعداد روی نقاط رادار", value=False)
     col_sz1, col_sz2 = st.columns(2)
@@ -558,35 +533,29 @@ with tabs[1]:
     org_series_slice = org_series[idx0:idx1]
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # رادار چندنقشی
     st.markdown('<div class="panel"><h4>رادار ۴۰‌بخشی (خوانا)</h4>', unsafe_allow_html=True)
     if role_means_filtered:
-        # تابع plot_radar از قبل tick_numbers کامل 1..40 می‌خواهد؛
         plot_radar(role_means_filtered, tick_numbers, tick_mapping_df, target=TARGET,
                    annotate=annotate_radar, height=radar_height, point_size=radar_point_size)
     else:
         st.info("نقشی برای نمایش انتخاب نشده است.")
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # رادار میانگین سازمان
     st.markdown('<div class="panel"><h4>رادار میانگین سازمان (وزن‌دهی فازی)</h4>', unsafe_allow_html=True)
     plot_radar({"میانگین سازمان": org_series_slice}, tick_numbers, tick_mapping_df,
                target=TARGET, annotate=annotate_radar, height=radar_height, point_size=radar_point_size)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # میله‌ای گروهی
     st.markdown('<div class="panel"><h4>نمودار میله‌ای گروهی (نقش‌ها)</h4>', unsafe_allow_html=True)
     plot_bars_multirole({r: role_means[r][idx0:idx1] for r in roles_selected},
                         labels_bar, "مقایسه رده‌ها (0..100)", target=TARGET, height=bar_height)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Top/Bottom
     st.markdown('<div class="panel"><h4>Top/Bottom — میانگین سازمان</h4>', unsafe_allow_html=True)
     plot_bars_top_bottom(org_series_slice, names_full, top=10)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # Heatmap و Boxplot + خوشه‌بندی
-    st.markdown('<div class="panel"><h4>Heatmap ، Boxplot و خوشه‌بندی</h4>', unsafe_allow_html=True)
+    st.markdown('<div class="panel"><h4>Heatmap و Boxplot</h4>', unsafe_allow_html=True)
     heat_df = pd.DataFrame({"موضوع":labels_bar})
     for r in roles_selected: heat_df[r] = role_means[r][idx0:idx1]
     hm = heat_df.melt(id_vars="موضوع", var_name="نقش", value_name="امتیاز")
@@ -596,7 +565,9 @@ with tabs[1]:
     fig_box = px.box(hm.dropna(), x="نقش", y="امتیاز", points="all", color="نقش",
                      color_discrete_map=ROLE_COLORS, template=PLOTLY_TEMPLATE)
     st.plotly_chart(fig_box, use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
+    st.markdown('<div class="panel"><h4>ماتریس همبستگی و خوشه‌بندی</h4>', unsafe_allow_html=True)
     corr_base = heat_df.set_index("موضوع")[roles_selected]
     if not corr_base.empty:
         corr = corr_base.T.corr()
@@ -628,9 +599,11 @@ with tabs[1]:
     else:
         st.caption("برای فعال‌شدن خوشه‌بندی، scikit-learn را نصب کنید (اختیاری).")
 
-    # دانلود
+    st.markdown('</div>', unsafe_allow_html=True)
+
     st.markdown('<div class="panel"><h4>دانلود</h4>', unsafe_allow_html=True)
     st.download_button("⬇️ دانلود CSV پاسخ‌های شرکت",
                        data=load_company_df(company).to_csv(index=False).encode("utf-8-sig"),
                        file_name=f"{_sanitize_company_name(company)}_responses.csv", mime="text/csv")
     st.caption("برای دانلود تصویر نمودارها، می‌توانید بستهٔ اختیاری `kaleido` را نصب کنید.")
+    st.markdown('</div>', unsafe_allow_html=True)
