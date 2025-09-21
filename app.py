@@ -31,6 +31,7 @@ except Exception:
 BASE = Path(".")
 
 def _safe_dir(p: Path) -> Path:
+    """اگر مسیر وجود داشت ولی دایرکتوری نبود، به مسیر جایگزین برود تا FileExistsError نگیریم."""
     if p.exists():
         if p.is_dir():
             return p
@@ -43,52 +44,57 @@ def _safe_dir(p: Path) -> Path:
 DATA_DIR   = _safe_dir(BASE / "data")
 ASSETS_DIR = _safe_dir(BASE / "assets")
 
-# ---------------- CSS/Font: تزریق امن بدون نمایش متن خام ----------------
-def inject_css_safe():
-    if st.session_state.get("_css_ok"):  # فقط یک‌بار
-        return
+# ---------------- CSS/Font: تزریق امن در هر اجرا + مخفی‌سازی pre/code ----------------
+def inject_css():
     css = """
 :root{--brand:#16325c;--accent:#0f3b8f;--border:#e8eef7;--font:Vazir,Tahoma,Arial,sans-serif}
 html,body,*{font-family:var(--font)!important;direction:rtl}
 .block-container{padding-top:.6rem;padding-bottom:3rem}
 h1,h2,h3,h4{color:var(--brand)}
+/* جلوگیری از نمایش هر خروجی code/pre (مثلاً اگر موتور موقتاً CSS خام را به صورت کد رندر کند) */
+.stMarkdown pre, .stMarkdown code{display:none!important}
+
+/* هدر چسبنده */
 .header-sticky{position:sticky;top:0;z-index:999;background:#ffffffcc;backdrop-filter:blur(6px);border-bottom:1px solid #eef2f7;padding:8px 12px;margin:-10px -1rem 10px -1rem}
 .header-sticky .wrap{display:flex;align-items:center;gap:12px}
 .header-sticky .title{font-weight:800;color:var(--brand);font-size:18px;margin:0}
+
+/* کارت سوال */
 .question-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin:10px 0 16px;box-shadow:0 6px 16px rgba(36,74,143,.06),inset 0 1px 0 rgba(255,255,255,.6)}
 .q-head{font-weight:800;color:var(--brand);font-size:15px;margin-bottom:8px}
 .q-desc{color:#222;font-size:14px;line-height:1.9;margin-bottom:10px;text-align:justify}
 .q-num{display:inline-block;background:#e8f0fe;color:var(--brand);font-weight:700;border-radius:8px;padding:2px 8px;margin-left:6px;font-size:12px}
 .q-question{color:var(--accent);font-weight:700;margin:.2rem 0 .4rem}
+
+/* KPI */
 .kpi{border-radius:14px;padding:16px 18px;border:1px solid #e6ecf5;background:linear-gradient(180deg,#fff 0%,#f6f9ff 100%);box-shadow:0 8px 20px rgba(0,0,0,.05);min-height:96px}
 .kpi .title{color:#456;font-size:13px;margin-bottom:6px}
 .kpi .value{color:var(--accent);font-size:22px;font-weight:800}
 .kpi .sub{color:#6b7c93;font-size:12px}
+
+/* پنل */
 .panel{background:linear-gradient(180deg,#f2f7ff 0%,#eaf3ff 100%);border:1px solid #d7e6ff;border-radius:16px;padding:16px 18px;margin:12px 0 18px 0;box-shadow:0 10px 24px rgba(31,79,176,.1),inset 0 1px 0 rgba(255,255,255,.8)}
 .panel h3,.panel h4{margin-top:0;color:#17407a}
+
+/* جدول نگاشت کنار رادار */
 .mapping table{font-size:12px}
 .mapping .row_heading,.mapping .blank{display:none}
+
+/* تب‌ها راست‌به‌چپ */
 .stTabs [role=tab]{direction:rtl}
 """
     b64css = base64.b64encode(css.encode("utf-8")).decode()
-    html = f"""
+    st.markdown(
+        f"""
 <link rel="stylesheet"
       href="https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/font-face.css">
 <link rel="stylesheet" href="data:text/css;base64,{b64css}">
-"""
-    # با link تزریق می‌کنیم تا متن خام هیچ‌وقت دیده نشود
-    st.markdown(html, unsafe_allow_html=True)
-    st.session_state["_css_ok"] = True
-
-def _suppress_raw_code_blocks():
-    # هر خروجی کد/پری که احتمالاً CSS خام داخلش چاپ شده باشد، مخفی می‌شود.
-    st.markdown(
-        "<style>.stMarkdown pre, .stMarkdown code { display:none !important; }</style>",
-        unsafe_allow_html=True
+""",
+        unsafe_allow_html=True,
     )
 
-inject_css_safe()
-_suppress_raw_code_blocks()   # ← قطع‌کن نمایش متن خام
+# تزریق در هر اجرا
+inject_css()
 
 PLOTLY_TEMPLATE = "plotly_white"
 TARGET = 45  # 🎯
@@ -322,7 +328,8 @@ def org_weighted_topic(per_role_norm_fa, topic_id: int):
     en2fa = ROLE_MAP_EN2FA
     for en_key, weight in w.items():
         fa = en2fa[en_key]; lst = per_role_norm_fa.get(fa, []); idx = topic_id-1
-        if idx < len(lst) and pd.notna(lst[idx]): num += weight * lst[idx]; den += weight
+        if idx < len(lst) and pd.notna(lst[idx]):
+            num += weight * lst[idx]; den += weight
     return np.nan if den == 0 else num/den
 
 # ---------------- هدر/لوگو ----------------
@@ -346,6 +353,7 @@ tabs = st.tabs(["📝 پرسشنامه","📊 داشبورد"])
 
 # ======================= پرسشنامه =======================
 with tabs[0]:
+    # هدر چسبنده با لوگو
     st.markdown(
         f'''
         <div class="header-sticky">
@@ -358,9 +366,11 @@ with tabs[0]:
         unsafe_allow_html=True
     )
 
+    # پیام موفقیت پس از رفرش
     if st.session_state.pop("submitted_ok", False):
         st.success("✅ پاسخ شما با موفقیت ذخیره شد و فرم ریست شد.")
 
+    # برندینگ هلدینگ (آپلود لوگو)
     with st.expander("⚙️ برندینگ هلدینگ (اختیاری)"):
         holding_logo_file = st.file_uploader("لوگوی هلدینگ انرژی گستر سینا", type=["png","jpg","jpeg"], key="upl_holding_logo")
         if holding_logo_file:
@@ -370,6 +380,7 @@ with tabs[0]:
 
     st.info("برای هر موضوع ابتدا توضیح فارسی آن را بخوانید، سپس با توجه به دو پرسش ذیل هر موضوع، یکی از گزینه‌های زیر هر پرسش را انتخاب بفرمایید.")
 
+    # فرم پرسشنامه (برای ریست تمیز)
     with st.form("survey_form", clear_on_submit=False):
         company = st.text_input("نام شرکت", key="company_input")
         respondent = st.text_input("نام و نام خانوادگی (اختیاری)", key="respondent_input")
@@ -400,202 +411,4 @@ with tabs[0]:
             st.error("لطفاً همهٔ ۴۰ موضوع را پاسخ دهید.")
         else:
             ensure_company(company)
-            rec = {"timestamp": datetime.now().isoformat(timespec="seconds"),
-                   "company": company, "respondent": respondent, "role": role}
-            m_map = dict(LEVEL_OPTIONS); r_map = dict(REL_OPTIONS)
-            for t in TOPICS:
-                m_label, r_label = answers[t['id']]
-                m = m_map.get(m_label, 0); r = r_map.get(r_label, 1)
-                rec[f"t{t['id']}_maturity"] = m
-                rec[f"t{t['id']}_rel"] = r
-                rec[f"t{t['id']}_adj"] = m * r
-            save_response(company, rec)
-            reset_survey_state()
-            st.session_state["submitted_ok"] = True
-            st.rerun()
-
-# ======================= داشبورد =======================
-with tabs[1]:
-    st.subheader("📊 داشبورد نتایج")
-
-    if not PLOTLY_OK:
-        st.error("برای نمایش داشبورد باید بستهٔ Plotly نصب باشد: `pip install plotly`")
-        st.stop()
-
-    password = st.text_input("🔑 رمز عبور داشبورد را وارد کنید", type="password")
-    if password != "Emacraven110":
-        st.warning("رمز درست را وارد کنید.")
-        st.stop()
-
-    companies = sorted([d.name for d in DATA_DIR.iterdir() if d.is_dir() and (DATA_DIR/d.name/"responses.csv").exists()])
-    if not companies:
-        st.info("هنوز هیچ پاسخی ثبت نشده است.")
-        st.stop()
-
-    company = st.selectbox("انتخاب شرکت", companies)
-    df = load_company_df(company)
-    if df.empty:
-        st.info("برای این شرکت پاسخی وجود ندارد.")
-        st.stop()
-
-    st.markdown('<div class="panel"><h4>خلاصه مشارکت شرکت</h4>', unsafe_allow_html=True)
-    total_n = len(df)
-    st.markdown(f"**{_sanitize_company_name(company)}** — تعداد کل پاسخ‌ها: **{total_n}**")
-
-    role_counts = df["role"].value_counts().reindex(ROLES).fillna(0).astype(int)
-    rc_df = pd.DataFrame({"نقش/رده": role_counts.index, "تعداد پاسخ‌ها": role_counts.values})
-    st.dataframe(rc_df, use_container_width=True, hide_index=True)
-    fig_cnt = px.bar(rc_df, x="نقش/رده", y="تعداد پاسخ‌ها", template=PLOTLY_TEMPLATE, title="تعداد پاسخ‌دهندگان به تفکیک رده سازمانی")
-    st.plotly_chart(fig_cnt, use_container_width=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    colL, colH, colC = st.columns([1,1,6])
-    with colH:
-        if (ASSETS_DIR/"holding_logo.png").exists():
-            st.image(str(ASSETS_DIR/"holding_logo.png"), width=90, caption="هلدینگ")
-    with colL:
-        st.caption("لوگوی شرکت:")
-        comp_logo_file = st.file_uploader("آپلود/به‌روزرسانی لوگو", key="uplogo", type=["png","jpg","jpeg"])
-        if comp_logo_file:
-            (DATA_DIR/_sanitize_company_name(company)/"logo.png").write_bytes(comp_logo_file.getbuffer())
-            st.success("لوگوی شرکت ذخیره شد.")
-            st.rerun()
-        comp_logo_path = get_company_logo_path(company)
-        if comp_logo_path:
-            st.image(str(comp_logo_path), width=90, caption=company)
-
-    for t in TOPICS:
-        c = f"t{t['id']}_adj"
-        df[c] = pd.to_numeric(df[c], errors="coerce")
-        df[c] = df[c].apply(lambda x: (x/40)*100 if pd.notna(x) else np.nan)
-
-    role_means = {}
-    for r in ROLES:
-        sub = df[df["role"]==r]
-        role_means[r] = [sub[f"t{t['id']}_adj"].mean() if not sub.empty else np.nan for t in TOPICS]
-
-    per_role_norm_fa = {r: role_means[r] for r in ROLES}
-    org_series = [org_weighted_topic(per_role_norm_fa, t["id"]) for t in TOPICS]
-
-    st.markdown('<div class="panel">', unsafe_allow_html=True)
-    nanmean_org = np.nanmean(org_series)
-    org_avg = float(nanmean_org) if np.isfinite(nanmean_org) else 0.0
-    pass_rate = (np.mean([1 if (v >= TARGET) else 0 for v in org_series if pd.notna(v)]) * 100
-                 if any(pd.notna(v) for v in org_series) else 0)
-    simple_means = [np.nanmean([role_means[r][i] for r in ROLES if pd.notna(role_means[r][i])]) for i in range(40)]
-    has_any = any(np.isfinite(x) for x in simple_means)
-    if has_any:
-        best_idx = int(np.nanargmax(simple_means)); worst_idx = int(np.nanargmin(simple_means))
-        best_label = f"{best_idx+1:02d} — {TOPICS[best_idx]['name']}"
-        worst_label = f"{worst_idx+1:02d} — {TOPICS[worst_idx]['name']}"
-    else:
-        best_label = "-"; worst_label = "-"
-
-    k1,k2,k3,k4 = st.columns(4)
-    k1.markdown(f"""<div class="kpi"><div class="title">میانگین سازمان (فازی)</div>
-    <div class="value">{org_avg:.1f}</div><div class="sub">از 100</div></div>""", unsafe_allow_html=True)
-    k2.markdown(f"""<div class="kpi"><div class="title">نرخ عبور از هدف</div>
-    <div class="value">{pass_rate:.0f}%</div><div class="sub">نقاط ≥ {TARGET}</div></div>""", unsafe_allow_html=True)
-    k3.markdown(f"""<div class="kpi"><div class="title">بهترین موضوع</div>
-    <div class="value">{best_label}</div><div class="sub">میانگین ساده نقش‌ها</div></div>""", unsafe_allow_html=True)
-    k4.markdown(f"""<div class="kpi"><div class="title">ضعیف‌ترین موضوع</div>
-    <div class="value">{worst_label}</div><div class="sub">میانگین ساده نقش‌ها</div></div>""", unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    st.markdown('<div class="panel"><h4>فیلترها و تنظیمات نمایش</h4>', unsafe_allow_html=True)
-    annotate_radar = st.checkbox("نمایش اعداد روی نقاط رادار", value=False)
-    col_sz1, col_sz2 = st.columns(2)
-    with col_sz1:
-        radar_point_size = st.slider("اندازه نقاط رادار", 4, 12, 7, key="rad_pt")
-    with col_sz2:
-        radar_height = st.slider("ارتفاع رادار (px)", 600, 1100, 900, 50, key="rad_h")
-    bar_height = st.slider("ارتفاع نمودار میله‌ای (px)", 400, 900, 600, 50, key="bar_h")
-
-    roles_selected = st.multiselect("نقش‌های قابل نمایش", ROLES, default=ROLES)
-    topic_range = st.slider("بازهٔ موضوع‌ها", 1, 40, (1,40))
-    label_mode = st.radio("حالت برچسب محور X / زاویه", ["شماره (01..40)","نام کوتاه","نام کامل"], horizontal=True)
-    idx0, idx1 = topic_range[0]-1, topic_range[1]
-    topics_slice = TOPICS[idx0:idx1]
-    names_full = [t['name'] for t in topics_slice]
-    names_short = [n if len(n)<=14 else n[:13]+"…" for n in names_full]
-    labels_bar = [f"{i+idx0+1:02d}" for i,_ in enumerate(topics_slice)] if label_mode=="شماره (01..40)" else (names_short if label_mode=="نام کوتاه" else names_full)
-    tick_numbers = [f"{i+idx0+1:02d}" for i,_ in enumerate(topics_slice)]
-    tick_mapping_df = pd.DataFrame({"شماره":tick_numbers, "نام موضوع":names_full})
-    role_means_filtered = {r: role_means[r][idx0:idx1] for r in roles_selected}
-    org_series_slice = org_series[idx0:idx1]
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    st.markdown('<div class="panel"><h4>رادار ۴۰‌بخشی (خوانا)</h4>', unsafe_allow_html=True)
-    if role_means_filtered:
-        plot_radar(role_means_filtered, tick_numbers, tick_mapping_df, target=TARGET,
-                   annotate=annotate_radar, height=radar_height, point_size=radar_point_size)
-    else:
-        st.info("نقشی برای نمایش انتخاب نشده است.")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    st.markdown('<div class="panel"><h4>رادار میانگین سازمان (وزن‌دهی فازی)</h4>', unsafe_allow_html=True)
-    plot_radar({"میانگین سازمان": org_series_slice}, tick_numbers, tick_mapping_df,
-               target=TARGET, annotate=annotate_radar, height=radar_height, point_size=radar_point_size)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    st.markdown('<div class="panel"><h4>نمودار میله‌ای گروهی (نقش‌ها)</h4>', unsafe_allow_html=True)
-    plot_bars_multirole({r: role_means[r][idx0:idx1] for r in roles_selected},
-                        labels_bar, "مقایسه رده‌ها (0..100)", target=TARGET, height=bar_height)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    st.markdown('<div class="panel"><h4>Top/Bottom — میانگین سازمان</h4>', unsafe_allow_html=True)
-    plot_bars_top_bottom(org_series_slice, names_full, top=10)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    st.markdown('<div class="panel"><h4>Heatmap و Boxplot</h4>', unsafe_allow_html=True)
-    heat_df = pd.DataFrame({"موضوع":labels_bar})
-    for r in roles_selected: heat_df[r] = role_means[r][idx0:idx1]
-    hm = heat_df.melt(id_vars="موضوع", var_name="نقش", value_name="امتیاز")
-    fig_heat = px.density_heatmap(hm, x="نقش", y="موضوع", z="امتیاز",
-                                  color_continuous_scale="RdYlGn", height=560, template=PLOTLY_TEMPLATE)
-    st.plotly_chart(fig_heat, use_container_width=True)
-    fig_box = px.box(hm.dropna(), x="نقش", y="امتیاز", points="all", color="نقش",
-                     color_discrete_map=ROLE_COLORS, template=PLOTLY_TEMPLATE)
-    st.plotly_chart(fig_box, use_container_width=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    st.markdown('<div class="panel"><h4>ماتریس همبستگی و خوشه‌بندی</h4>', unsafe_allow_html=True)
-    corr_base = heat_df.set_index("موضوع")[roles_selected]
-    if not corr_base.empty:
-        corr = corr_base.T.corr()
-        fig_corr = px.imshow(corr, text_auto=True, color_continuous_scale="RdBu_r",
-                             aspect="auto", height=620, template=PLOTLY_TEMPLATE)
-        st.plotly_chart(fig_corr, use_container_width=True)
-    if SKLEARN_OK and not corr_base.empty:
-        try:
-            X_raw = corr_base.values
-            imp_med = SimpleImputer(strategy="median"); X_med = imp_med.fit_transform(X_raw)
-            if np.isnan(X_med).any():
-                imp_zero = SimpleImputer(strategy="constant", fill_value=0.0); X = imp_zero.fit_transform(X_raw)
-            else:
-                X = X_med
-            if np.allclose(X, 0) or np.nanstd(X) == 0:
-                st.info("دادهٔ کافی/متغیر برای خوشه‌بندی وجود ندارد.")
-            else:
-                k = st.slider("تعداد خوشه‌ها (K)", 2, 6, 3)
-                K = min(k, X.shape[0]) if X.shape[0] >= 2 else 2
-                if X.shape[0] >= 2:
-                    km = KMeans(n_clusters=K, n_init=10, random_state=42).fit(X)
-                    clusters = km.labels_
-                    cl_df = pd.DataFrame({"موضوع":corr_base.index,"خوشه":clusters}).sort_values("خوشه")
-                    st.dataframe(cl_df, use_container_width=True)
-                else:
-                    st.info("برای خوشه‌بندی حداقل به ۲ موضوع نیاز است.")
-        except Exception as e:
-            st.warning(f"خوشه‌بندی انجام نشد: {e}")
-    else:
-        st.caption("برای فعال‌شدن خوشه‌بندی، scikit-learn را نصب کنید (اختیاری).")
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    st.markdown('<div class="panel"><h4>دانلود</h4>', unsafe_allow_html=True)
-    st.download_button("⬇️ دانلود CSV پاسخ‌های شرکت",
-                       data=load_company_df(company).to_csv(index=False).encode("utf-8-sig"),
-                       file_name=f"{_sanitize_company_name(company)}_responses.csv", mime="text/csv")
-    st.caption("برای دانلود تصویر نمودارها، می‌توانید بستهٔ اختیاری `kaleido` را نصب کنید.")
-    st.markdown('</div>', unsafe_allow_html=True)
+            rec = {"timestamp": datetime
