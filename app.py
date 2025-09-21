@@ -79,7 +79,7 @@ h1,h2,h3,h4{ color:#16325c; }
   background:linear-gradient(180deg,#ffffff 0%,#f6f9ff 100%); box-shadow:0 8px 20px rgba(0,0,0,0.05);
   min-height:96px;
 }
-<style>
+
 .kpi .title{ color:#456; font-size:13px; margin-bottom:6px; }
 .kpi .value{ color:#0f3b8f; font-size:22px; font-weight:800; }
 .kpi .sub{ color:#6b7c93; font-size:12px; }
@@ -95,6 +95,7 @@ h1,h2,h3,h4{ color:#16325c; }
 /* جدول نگاشت کنار رادار */
 .mapping table{ font-size:12px; }
 .mapping .row_heading, .mapping .blank{ display:none; }
+<style>
 
 .stTabs [role="tab"]{ direction: rtl; }
 </style>
@@ -649,3 +650,4 @@ with tabs[1]:
                        file_name=f"{_sanitize_company_name(company)}_responses.csv", mime="text/csv")
     st.caption("برای دانلود تصویر نمودارها، می‌توانید بستهٔ اختیاری `kaleido` را نصب کنید.")
     st.markdown('</div>', unsafe_allow_html=True)
+
