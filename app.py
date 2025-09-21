@@ -80,7 +80,15 @@ h1,h2,h3,h4{color:var(--brand)}
     st.markdown(html, unsafe_allow_html=True)
     st.session_state["_css_ok"] = True
 
+def _suppress_raw_code_blocks():
+    # هر خروجی کد/پری که احتمالاً CSS خام داخلش چاپ شده باشد، مخفی می‌شود.
+    st.markdown(
+        "<style>.stMarkdown pre, .stMarkdown code { display:none !important; }</style>",
+        unsafe_allow_html=True
+    )
+
 inject_css_safe()
+_suppress_raw_code_blocks()   # ← قطع‌کن نمایش متن خام
 
 PLOTLY_TEMPLATE = "plotly_white"
 TARGET = 45  # 🎯
