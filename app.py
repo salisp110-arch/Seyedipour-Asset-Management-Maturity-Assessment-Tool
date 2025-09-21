@@ -8,7 +8,6 @@ from pathlib import Path
 from datetime import datetime
 from typing import Optional
 from textwrap import dedent
-import streamlit.components.v1 as components
 
 # ---------------- Page config ----------------
 st.set_page_config(page_title="پرسشنامه و داشبورد مدیریت دارایی", layout="wide")
@@ -46,15 +45,25 @@ def _safe_dir(p: Path) -> Path:
 DATA_DIR   = _safe_dir(BASE / "data")     # اگر فایل با نام data بود، به _data_dir می‌رود
 ASSETS_DIR = _safe_dir(BASE / "assets")
 
-# ---------------- تزریق قطعی CSS (دیگر به‌صورت متن چاپ نمی‌شود) ----------------
+# ---------------- تزریق قطعی CSS (Vazir + RTL) ----------------
 def inject_global_css():
-    html_css = dedent("""
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/font-face.css">
+    st.markdown(dedent("""
     <style>
+    /* بارگذاری وزیر */
+    @import url('https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/font-face.css');
+
     :root{ --app-font: Vazir, Tahoma, Arial, sans-serif; }
-    html, body, * { font-family: var(--app-font) !important; direction: rtl; }
+
+    /* سراسری: فونت وزیر + راست‌به‌چپ */
+    html, body, .stApp, .block-container, [class^="css"] {
+      font-family: var(--app-font) !important;
+      direction: rtl !important;
+      text-align: right;
+    }
+
+    /* بهبودهای ظاهری پایه */
     .block-container{ padding-top: .6rem; padding-bottom: 3rem; }
-    h1,h2,h3,h4{ color:#16325c; }
+    h1,h2,h3,h4{ color:#16325c; text-align:right; }
 
     /* هدر چسبنده */
     .header-sticky{
@@ -72,7 +81,7 @@ def inject_global_css():
       border: 1px solid #e8eef7; box-shadow: 0 6px 16px rgba(36,74,143,0.08), inset 0 1px 0 rgba(255,255,255,0.7);
     }
     .q-head{ font-weight:800; color:#16325c; font-size:15px; margin-bottom:8px; }
-    .q-desc{ color:#222; font-size:14px; line-height:1.9; margin-bottom:10px; }
+    .q-desc{ color:#222; font-size:14px; line-height:1.9; margin-bottom:10px; text-align: justify; }
     .q-num{ display:inline-block; background:#e8f0fe; color:#16325c; font-weight:700; border-radius:8px; padding:2px 8px; margin-left:6px; font-size:12px;}
     .q-question{ color:#0f3b8f; font-weight:700; margin:.2rem 0 .4rem 0; }
 
@@ -98,10 +107,14 @@ def inject_global_css():
     .mapping table{ font-size:12px; }
     .mapping .row_heading, .mapping .blank{ display:none; }
 
-    .stTabs [role="tab"]{ direction: rtl; }
+    /* تب‌ها راست‌به‌چپ */
+    .stTabs [role="tablist"], .stTabs [role="tab"]{ direction: rtl; }
+
+    /* ویجت‌ها */
+    .stRadio, .stSelectbox, .stTextInput, .stNumberInput, .stDateInput, .stTextArea { direction: rtl; text-align: right; }
+    .stButton>button { font-family: var(--app-font) !important; }
     </style>
-    """)
-    components.html(html_css, height=0)
+    """), unsafe_allow_html=True)
 
 inject_global_css()
 
@@ -210,7 +223,7 @@ LEVEL_OPTIONS = [
 ]
 REL_OPTIONS = [("هیچ ارتباطی ندارد.",1),("ارتباط کم دارد.",3),("تا حدی مرتبط است.",5),("ارتباط زیادی دارد.",7),("کاملاً مرتبط است.",10)]
 ROLE_MAP_EN2FA={"Senior Managers":"مدیران ارشد","Executives":"مدیران اجرایی","Supervisors/Sr Experts":"سرپرستان / خبرگان","Technical Experts":"متخصصان فنی","Non-Technical Experts":"متخصصان غیر فنی"}
-NORM_WEIGHTS = {
+NORM_WEIGHTS = {  # <- همانی که داشتی (برای اختصار حذف نشده)
     1:{"Senior Managers":0.3846,"Executives":0.2692,"Supervisors/Sr Experts":0.1923,"Technical Experts":0.1154,"Non-Technical Experts":0.0385},
     2:{"Senior Managers":0.2692,"Executives":0.3846,"Supervisors/Sr Experts":0.1923,"Technical Experts":0.1154,"Non-Technical Experts":0.0385},
     3:{"Senior Managers":0.3846,"Executives":0.2692,"Supervisors/Sr Experts":0.1923,"Technical Experts":0.1154,"Non-Technical Experts":0.0385},
@@ -290,7 +303,7 @@ def get_company_logo_path(company: str) -> Optional[Path]:
             return p
     return None
 
-def companies_with_responses() -> list[str]:
+def companies_with_responses():
     return sorted([d.name for d in DATA_DIR.iterdir() if d.is_dir() and (DATA_DIR/d.name/"responses.csv").exists()])
 
 def build_participation_summary_df() -> pd.DataFrame:
@@ -484,7 +497,7 @@ with tabs[1]:
         st.info("هنوز هیچ پاسخی ثبت نشده است.")
         st.stop()
 
-    # ---------- پنل جدید: خلاصه مشارکت همه شرکت‌ها ----------
+    # ---------- پنل: خلاصه مشارکت همه شرکت‌ها ----------
     st.markdown('<div class="panel"><h4>خلاصه مشارکت همهٔ شرکت‌ها</h4>', unsafe_allow_html=True)
     summary_df = build_participation_summary_df()
     try:
@@ -492,7 +505,6 @@ with tabs[1]:
     except TypeError:
         st.dataframe(summary_df.set_index("شرکت"), use_container_width=True)
 
-    # نمودار پشته‌ای تعداد پاسخ‌دهندگان به تفکیک رده برای هر شرکت
     if not summary_df.empty and summary_df.shape[0] > 0:
         melt_df = summary_df.melt(id_vars=["شرکت","کل"], value_vars=ROLES, var_name="رده", value_name="تعداد")
         fig_part = px.bar(
@@ -510,7 +522,7 @@ with tabs[1]:
         )
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ---------- انتخاب شرکت و ادامهٔ تحلیل ----------
+    # ---------- انتخاب شرکت ----------
     company = st.selectbox("انتخاب شرکت", companies)
     df = load_company_df(company)
     if df.empty:
@@ -528,7 +540,9 @@ with tabs[1]:
         st.dataframe(rc_df, use_container_width=True, hide_index=True)
     except TypeError:
         st.dataframe(rc_df.set_index("نقش/رده"), use_container_width=True)
-    fig_cnt = px.bar(rc_df, x="نقش/رده", y="تعداد پاسخ‌ها", template=PLOTLY_TEMPLATE, title="تعداد پاسخ‌دهندگان به تفکیک رده سازمانی")
+
+    fig_cnt = px.bar(rc_df, x="نقش/رده", y="تعداد پاسخ‌ها", template=PLOTLY_TEMPLATE,
+                     title="تعداد پاسخ‌دهندگان به تفکیک رده سازمانی")
     st.plotly_chart(fig_cnt, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
