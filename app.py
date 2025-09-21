@@ -53,15 +53,6 @@ html, body, * { font-family: var(--app-font) !important; direction: rtl; }
 .block-container{ padding-top: .6rem; padding-bottom: 3rem; }
 h1,h2,h3,h4{ color:#16325c; }
 
-/* هدر چسبنده */
-.header-sticky{
-  position: sticky; top: 0; z-index: 999;
-  background: #ffffffcc; backdrop-filter: blur(6px);
-  border-bottom: 1px solid #eef2f7; padding: 8px 12px; margin: -10px -1rem 10px -1rem;
-}
-.header-sticky .wrap{ display:flex; align-items:center; gap:12px; }
-.header-sticky .title{ font-weight:800; color:#16325c; font-size:18px; margin:0; }
-
 /* کارت سوال */
 .question-card{
   background: rgba(255,255,255,0.78); backdrop-filter: blur(6px);
@@ -98,6 +89,7 @@ h1,h2,h3,h4{ color:#16325c; }
 .stTabs [role="tab"]{ direction: rtl; }
 </style>
 """, unsafe_allow_html=True)
+
 
 PLOTLY_TEMPLATE = "plotly_white"
 TARGET = 45  # 🎯
@@ -648,3 +640,4 @@ with tabs[1]:
                        file_name=f"{_sanitize_company_name(company)}_responses.csv", mime="text/csv")
     st.caption("برای دانلود تصویر نمودارها، می‌توانید بستهٔ اختیاری `kaleido` را نصب کنید.")
     st.markdown('</div>', unsafe_allow_html=True)
+
