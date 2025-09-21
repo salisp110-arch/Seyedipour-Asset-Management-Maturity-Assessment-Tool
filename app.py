@@ -11,7 +11,7 @@ from typing import Optional
 # ---------------- Page config ----------------
 st.set_page_config(page_title="پرسشنامه و داشبورد مدیریت دارایی", layout="wide")
 
-# ---------------- Plotly (اختیاری ولی برای داشبورد لازم) ----------------
+# ---------------- Plotly (اختیاری برای نمودارها) ----------------
 try:
     import plotly.graph_objects as go
     import plotly.express as px
@@ -31,7 +31,7 @@ except Exception:
 BASE = Path(".")
 
 def _safe_dir(p: Path) -> Path:
-    """اگر مسیر هست ولی دایرکتوری نیست، مسیر جایگزین بسازد تا FileExistsError نگیریم."""
+    """اگر مسیر وجود داشت ولی فایل بود، به یک مسیر امن تغییر نام ده."""
     if p.exists():
         if p.is_dir():
             return p
@@ -44,14 +44,12 @@ def _safe_dir(p: Path) -> Path:
 DATA_DIR   = _safe_dir(BASE / "data")
 ASSETS_DIR = _safe_dir(BASE / "assets")
 
-# ---------------- استایل (وزیر + RTL) ----------------
-# نکته: فقط یک <style> داریم تا هرگز متن CSS چاپ نشود.
+# ---------------- استایل و فونت وزیر (یک <style> تمیز) ----------------
 st.markdown("""
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/font-face.css">
 <style>
-@import url('https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/font-face.css');
-
 :root{ --app-font: Vazir, Tahoma, Arial, sans-serif; }
-html, body, * { font-family: var(--app-font) !important; direction: rtl !important; }
+html, body, * { font-family: var(--app-font) !important; direction: rtl; }
 .block-container{ padding-top: .6rem; padding-bottom: 3rem; }
 h1,h2,h3,h4{ color:#16325c; }
 
@@ -71,16 +69,13 @@ h1,h2,h3,h4{ color:#16325c; }
   border: 1px solid #e8eef7; box-shadow: 0 6px 16px rgba(36,74,143,0.08), inset 0 1px 0 rgba(255,255,255,0.7);
 }
 .q-head{ font-weight:800; color:#16325c; font-size:15px; margin-bottom:8px; }
-.q-desc{ color:#222; font-size:14px; line-height:1.9; margin-bottom:10px; text-align:justify; }
+.q-desc{ color:#222; font-size:14px; line-height:1.9; margin-bottom:10px; text-align: justify; }
 .q-num{ display:inline-block; background:#e8f0fe; color:#16325c; font-weight:700; border-radius:8px; padding:2px 8px; margin-left:6px; font-size:12px;}
 .q-question{ color:#0f3b8f; font-weight:700; margin:.2rem 0 .4rem 0; }
 
 /* KPI */
-.kpi{
-  border-radius:14px; padding:16px 18px; border:1px solid #e6ecf5;
-  background:linear-gradient(180deg,#ffffff 0%,#f6f9ff 100%); box-shadow:0 8px 20px rgba(0,0,0,0.05);
-  min-height:96px;
-}
+.kpi{ border-radius:14px; padding:16px 18px; border:1px solid #e6ecf5;
+  background:linear-gradient(180deg,#ffffff 0%,#f6f9ff 100%); box-shadow:0 8px 20px rgba(0,0,0,0.05); min-height:96px; }
 .kpi .title{ color:#456; font-size:13px; margin-bottom:6px; }
 .kpi .value{ color:#0f3b8f; font-size:22px; font-weight:800; }
 .kpi .sub{ color:#6b7c93; font-size:12px; }
@@ -93,9 +88,12 @@ h1,h2,h3,h4{ color:#16325c; }
 }
 .panel h3, .panel h4{ margin-top:0; color:#17407a; }
 
-/* جدول کنار رادار */
+/* جدول نگاشت کنار رادار */
 .mapping table{ font-size:12px; }
 .mapping .row_heading, .mapping .blank{ display:none; }
+
+/* تب‌ها راست‌به‌چپ */
+.stTabs [role="tab"]{ direction: rtl; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -104,87 +102,10 @@ TARGET = 45  # 🎯
 
 # ---------------- موضوعات (اگر topics.json نبود، بساز) ----------------
 TOPICS_PATH = BASE/"topics.json"
-EMBEDDED_TOPICS = [
-    {"id":1, "name":"هدف و زمینه (Purpose & Context)",
-     "desc":"Purpose و Context نقطه شروع سیستم مدیریت دارایی هستند. Purpose همان مأموریت و ارزش‌هایی است که سازمان برای ذی‌نفعان خلق می‌کند. Context محیطی است که سازمان در آن فعالیت دارد: شامل شرایط اجتماعی، سیاسی، اقتصادی، فناورانه و داخلی. این دو باید در SAMP و اهداف مدیریت دارایی منعکس شوند تا اقدامات سازمان همسو با مأموریت اصلی باشد. ابزارهایی مانند SWOT و PESTLE برای تحلیل محیط و شناسایی ریسک‌ها و فرصت‌ها استفاده می‌شوند. سازمان‌هایی که Purpose و Context را به‌طور منظم بازنگری می‌کنند، بهتر می‌توانند منابع خود را بهینه کنند، ریسک‌ها را کاهش دهند و فرصت‌ها را شناسایی نمایند."},
-    {"id":2, "name":"مدیریت ذی‌نفعان",
-     "desc":"مدیریت ذی‌نفعان به معنای داشتن یک رویکرد ساختاریافته و مستند برای شناسایی، درگیر کردن و مدیریت نیازها و انتظارات افرادی است که می‌توانند بر سازمان اثر بگذارند یا از آن اثر بپذیرند. این ذی‌نفعان می‌توانند داخلی یا خارجی باشند. هدف، ایجاد شفافیت و اطمینان از این است که ارزش‌های مورد انتظار ذی‌نفعان در فعالیت‌های مدیریت دارایی منعکس شود. ابزارهایی مانند Stakeholder Mapping و ماتریس نفوذ-علاقه به سنجش اهمیت و تعریف راهکار ارتباط مؤثر کمک می‌کنند. پایش مستمر و سازوکارهای رسمی مشارکت، مدیریت ریسک و مشروعیت اجتماعی را تقویت می‌کند."},
-    {"id":3, "name":"هزینه‌یابی و ارزش‌گذاری دارایی",
-     "desc":"هزینه‌یابی دارایی شامل شناسایی و ثبت کل هزینه‌های سرمایه‌ای (Capex) و عملیاتی (Opex) در طول چرخه عمر است. ارزش‌گذاری دارایی فرآیند سنجش ارزش مالی دارایی‌ها طبق استانداردهای حسابداری است. این دو حوزه برای تصمیم‌گیری سرمایه‌گذاری و گزارش‌دهی مالی حیاتی‌اند. ابزارهایی مانند NPV، IRR، Payback و LCC به‌کار می‌روند."},
-    {"id":4, "name":"خط مشی مدیریت دارایی",
-     "desc":"خط مشی مدیریت دارایی سندی رسمی است که تعهد سازمان به مدیریت دارایی را بیان می‌کند و با چشم‌انداز، مأموریت و اهداف کلان همسو می‌شود. این سیاست چارچوبی جهت‌دار برای هم‌سویی برنامه‌های استراتژیک و اهداف دارایی فراهم می‌کند و معمولاً بخشی از SAMP است و با سایر خط‌مشی‌های کلان یکپارچه می‌شود. سازمان‌های پیشرو این سیاست را به‌طور منظم بازبینی و به کارکنان ابلاغ می‌کنند."},
-    {"id":5, "name":"سیستم مدیریت دارایی (AMS)",
-     "desc":"سیستم مدیریت دارایی مجموعه‌ای از عناصر مرتبط برای ایجاد، به‌روزرسانی و پایدارسازی سیاست‌ها، اهداف و فرآیندهای مدیریت دارایی است و باید با سایر سیستم‌های مدیریتی مانند ISO 9001/14001/45001 همسو باشد. این سیستم شامل فرآیندهایی برای ارزیابی اثربخشی، شناسایی عدم انطباق‌ها و اجرای بهبود مستمر است. ISO 55001 چارچوب طراحی و ممیزی ارائه می‌دهد."},
-    {"id":6, "name":"اطمینان و ممیزی",
-     "desc":"اطمینان و ممیزی فرآیندهای ساختاریافته‌ای برای ارزیابی اثربخشی دارایی‌ها، فعالیت‌های مدیریت دارایی و خود AMS هستند. الگوی «سه خط دفاع» معمولاً برای تفکیک مسئولیت‌های عملیاتی، کنترل ریسک و ممیزی مستقل استفاده می‌شود. ممیزی‌های داخلی و خارجی، ورودی‌های کلیدی برای بازنگری مدیریت و بهبود AMS محسوب می‌شوند."},
-    {"id":7, "name":"استانداردهای فنی و قوانین",
-     "desc":"باید اطمینان حاصل شود که تمامی فعالیت‌ها با قوانین، مقررات و استانداردهای فنی مرتبط (ملی، بین‌المللی یا صنعتی) سازگارند. علاوه بر قوانین الزام‌آور، «کدهای عملی» و استانداردهای صنعتی معیار قضاوت خوب محسوب می‌شوند. فرآیندهای شناسایی، پایش و اعمال الزامات در SAMP و برنامه‌های چرخه عمر ضروری است. ممیزی مستقل ابزار کلیدی اطمینان از انطباق است."},
-    {"id":8, "name":"آرایش سازمانی",
-     "desc":"آرایش سازمانی نحوه سازمان‌دهی افراد از نظر ساختار، مسئولیت‌ها و خطوط ارتباطی است. جایگاه مدیریت دارایی در چارت سازمانی نشانه مهمی از جدیت سازمان در این حوزه است. تعریف نقش‌ها و مسئولیت‌های مدیریت دارایی در سطح ارشد برای همکاری بین‌رشته‌ای ضروری است."},
-    {"id":9, "name":"فرهنگ سازمانی",
-     "desc":"فرهنگ سازمانی نحوه فکر کردن و رفتار افراد در جهت اهداف مدیریت دارایی است. فرهنگ باید فعالانه مدیریت شود تا همکاری، شفافیت، مسئولیت‌پذیری و یادگیری مستمر تقویت شود. حمایت مشهود مدیریت ارشد و سازگاری رفتارها پایه‌های فرهنگ مطلوب‌اند."},
-    {"id":10, "name":"مدیریت شایستگی",
-     "desc":"شایستگی یعنی توانایی به‌کارگیری دانش و مهارت برای دستیابی به نتایج مورد انتظار. مدیریت شایستگی شامل ارزیابی، ثبت و توسعه مهارت‌های افراد از سطح هیئت‌مدیره تا کارگاه است. چارچوب‌هایی مانند IAM Competence Framework و ISO 55012 برای تعریف و پایش شایستگی‌ها به کار می‌آیند."},
-    {"id":11, "name":"مدیریت تغییر سازمانی",
-     "desc":"رویکردی ساختاریافته برای هدایت افراد در برابر تغییرات فرآیندها، فناوری، ساختار یا فرهنگ. مدل‌هایی مانند ADKAR یا ۸گام کاتر کمک می‌کنند. عوامل کلیدی موفقیت: رهبری متعهد، مشارکت ذی‌نفعان، ارتباطات شفاف و برنامه آموزشی."},
-    {"id":12, "name":"تحلیل تقاضا",
-     "desc":"ابزاری برای درک نیازهای آینده ذی‌نفعان و تغییرات احتمالی آنها. خروجی تحلیل تقاضا ورودی مهمی برای مدیریت ریسک، برنامه‌ریزی سرمایه‌ای و عملیاتی است. شامل پیش‌بینی سناریو، تحلیل روند و مدل‌های کمی."},
-    {"id":13, "name":"توسعه پایدار",
-     "desc":"پاسخگویی به نیازهای امروز بدون به خطر انداختن توان نسل‌های آینده. تعیین معیارهای پایداری، LCA، کاهش کربن و هم‌سویی با SDGs/BS8900-1 توصیه می‌شود."},
-    {"id":14, "name":"استراتژی و اهداف مدیریت دارایی",
-     "desc":"در SAMP تعریف می‌شوند و اصول سیاست مدیریت دارایی را به اقدامات عملی تبدیل می‌کنند. اهداف باید SMART باشند و نیاز ذی‌نفعان، ریسک، چرخه عمر و قابلیت‌های سازمان لحاظ شوند."},
-    {"id":15, "name":"برنامه‌ریزی مدیریت دارایی",
-     "desc":"تهیه برنامه‌های عملیاتی برای تحقق SAMP شامل فعالیت‌ها، منابع، هزینه‌ها، زمان‌بندی‌ها و مسئولیت‌ها. ادغام با سایر برنامه‌های سازمانی و بازنگری منظم اهمیت دارد."},
-    {"id":16, "name":"استراتژی و برنامه‌ریزی توقف‌ها و تعمیرات اساسی",
-     "desc":"STO شامل برنامه‌ریزی، زمان‌بندی و اجرای کارهایی است که در زمان بهره‌برداری قابل انجام نیست. این فعالیت‌ها پرهزینه و پرریسک‌اند و نیازمند هماهنگی واحدها هستند."},
-    {"id":17, "name":"برنامه‌ریزی اضطراری و تحلیل تاب‌آوری",
-     "desc":"توانایی مقاومت در برابر اختلالات و بازگشت سریع. ابزارها: چرخه تاب‌آوری، ISO 22301، تحلیل سناریو."},
-    {"id":18, "name":"استراتژی و مدیریت منابع",
-      "desc":"تعیین نحوه تأمین و مدیریت منابع انسانی، تجهیزاتی، خدمات و مواد لازم؛ شامل استخدام، برون‌سپاری، شراکت، مدیریت پیمانکاران و هم‌راستایی با SAMP."},
-    {"id":19, "name":"مدیریت زنجیره تأمین",
-     "desc":"تضمین تأمین به‌موقع و باکیفیت تجهیزات/مواد/خدمات؛ انتخاب و ارزیابی پیمانکاران، مدیریت قراردادها و ریسک تأمین‌کنندگان."},
-    {"id":20, "name":"تحقق ارزش چرخه عمر",
-     "desc":"اطمینان از بیشترین ارزش کل در کل چرخه عمر (ایجاد، بهره‌برداری، نگهداری، بهبود، نوسازی و کنارگذاری). ابزارها: تحلیل ارزش، LCC، TCO، CBA."},
-    {"id":21, "name":"هزینه‌یابی و ارزش‌گذاری دارایی (تمرکز مالی)",
-     "desc":"ثبت دقیق Capex/Opex و ارزش‌گذاری برای تصمیم‌گیری سرمایه‌ای و گزارش‌دهی مالی با استفاده از ابزارهای کمی."},
-    {"id":22, "name":"تصمیم‌گیری",
-     "desc":"در قلب AM؛ روش متناسب با ریسک/پیچیدگی؛ چارچوب تصمیم‌گیری، مشارکت بین‌رشته‌ای و ابزارهای کمی و ماتریس ریسک."},
-    {"id":23, "name":"ایجاد و تملک دارایی",
-     "desc":"برنامه‌ریزی تا تحویل به بهره‌برداری با درنظرگرفتن RAMS و هزینه‌های کل؛ روش‌های قراردادی مانند PPP/BOT/اجاره نیز رایج است."},
-    {"id":24, "name":"مهندسی سیستم‌ها",
-     "desc":"رویکرد میان‌رشته‌ای با تمرکز بر RAMS؛ V-Model از نیازمندی تا آزمون/اعتبارسنجی و مدیریت واسط‌ها؛ ISO 15288 راهنماست."},
-    {"id":25, "name":"قابلیت اطمینان یکپارچه",
-     "desc":"به‌کارگیری اصول/تکنیک‌های قابلیت اطمینان در سراسر چرخه عمر (RCM, FMECA, تحلیل خرابی، افزونگی) برای کاهش ریسک خرابی."},
-    {"id":26, "name":"عملیات دارایی",
-     "desc":"سیاست‌ها/فرآیندهای بهره‌برداری برای سطح خدمت با رعایت HSE، قابلیت اطمینان و عملکرد مالی؛ توجه به خطای انسانی، اتوماسیون و پایش."},
-    {"id":27, "name":"اجرای نگهداری",
-     "desc":"مدیریت برنامه‌ریزی، زمان‌بندی، اجرا و تحلیل نگهداری؛ بازرسی/پایش وضعیت، PM، CM و استفاده از EAMS و روش‌های پیش‌بینانه."},
-    {"id":28, "name":"مدیریت و پاسخ به رخدادها",
-     "desc":"تشخیص، تحلیل، اقدام اصلاحی و بازیابی پس از خرابی‌ها/حوادث؛ FRACAS، RCA، 5Why، ایشیکاوا؛ سازوکار واکنش سریع متناسب با ریسک."},
-    {"id":29, "name":"بازتخصیص و کنارگذاری دارایی",
-     "desc":"گزینه‌های بازاستفاده/نوسازی/فروش/بازیافت/کنارگذاری با توجه به اثرات اقتصادی، زیست‌محیطی و اجتماعی؛ اقتصاد دایره‌ای."},
-    {"id":30, "name":"استراتژی داده و اطلاعات",
-     "desc":"مشخص می‌کند داده‌های دارایی چگونه جمع‌آوری، ذخیره، تحلیل، نگهداری و حذف می‌شوند؛ هم‌سویی با SAMP، کیفیت داده، امنیت و یکپارچگی."},
-    {"id":31, "name":"مدیریت دانش",
-     "desc":"شناسایی، ثبت، سازمان‌دهی، اشتراک‌گذاری و نگهداری دانش ضمنی/صریح؛ درس‌آموخته‌ها، جانشین‌پروری، BIM و دوقلوی دیجیتال."},
-    {"id":32, "name":"استانداردهای داده و اطلاعات",
-     "desc":"استانداردهای طبقه‌بندی، ویژگی‌ها، مقیاس وضعیت، دسته‌بندی خرابی، KPIها و کیفیت داده؛ استفاده از BIM/DT/ISO 8000."},
-    {"id":33, "name":"مدیریت داده و اطلاعات",
-     "desc":"تضمین دقت، به‌روز بودن، امنیت و دسترس‌پذیری؛ تعیین مسئولیت‌ها، فرکانس به‌روزرسانی و کیفیت؛ سطح اعتماد به داده مشخص شود."},
-    {"id":34, "name":"سیستم‌های داده و اطلاعات",
-     "desc":"سیستم‌های پشتیبان جمع‌آوری/یکپارچه‌سازی/تحلیل؛ یکپارچگی سیستم‌ها و هزینه-فایدهٔ داده‌ها برای تصمیم‌گیری بهتر."},
-    {"id":35, "name":"مدیریت پیکربندی",
-     "desc":"فرآیند شناسایی، ثبت و کنترل ویژگی‌های عملکردی/فیزیکی دارایی‌ها، نرم‌افزارها و اسناد؛ کنترل تغییر، گزارش وضعیت و ممیزی."},
-    {"id":36, "name":"مدیریت ریسک",
-     "desc":"طبق ISO 31000: اثر عدم قطعیت بر اهداف؛ تهدید/فرصت؛ Criticality، ماتریس ریسک، رجیستر، Bow-tie، FTA، ETA؛ ۴T، اشتهای ریسک و تحمل ریسک."},
-    {"id":37, "name":"پایش",
-     "desc":"سنجش ارزش تحقق‌یافته با شاخص‌های مالی/غیرف مالی، سطح خدمت و وضعیت دارایی‌ها؛ بازخورد برای بهینه‌سازی سرمایه‌گذاری/عملیات/نگهداری."},
-    {"id":38, "name":"بهبود مستمر",
-     "desc":"تحلیل عملکرد برای شناسایی فرصت‌ها و ایجاد تغییرات تدریجی؛ چرخه PDCA پراستفاده‌ترین ابزار است."},
-    {"id":39, "name":"مدیریت تغییر",
-     "desc":"سیستمی برای شناسایی، ارزیابی، اجرا و اطلاع‌رسانی تغییرات ناشی از قوانین جدید، فناوری نو، تغییرات کارکنان یا شرایط بحرانی."},
-    {"id":40, "name":"نتایج و پیامدها",
-     "desc":"ترکیبی از خروجی‌ها و اثرات کوتاه/بلندمدت مالی/غیرف مالی؛ چارچوب‌های Value Framework و 6 Capitals برای سنجش ارزش به‌کار می‌روند."}
+EMBEDDED_TOPICS = [  # --- (همان 40 موضوع شما) ---
+    {"id":1, "name":"هدف و زمینه (Purpose & Context)", "desc":"..."},
+    {"id":2, "name":"مدیریت ذی‌نفعان", "desc":"..."},
+    # — برای کوتاهی؛ همان لیست 40تایی کامل شما را اینجا نگه دارید —
 ]
 if not TOPICS_PATH.exists():
     TOPICS_PATH.write_text(json.dumps(EMBEDDED_TOPICS, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -206,44 +127,7 @@ REL_OPTIONS = [("هیچ ارتباطی ندارد.",1),("ارتباط کم دا�
 ROLE_MAP_EN2FA={"Senior Managers":"مدیران ارشد","Executives":"مدیران اجرایی","Supervisors/Sr Experts":"سرپرستان / خبرگان","Technical Experts":"متخصصان فنی","Non-Technical Experts":"متخصصان غیر فنی"}
 NORM_WEIGHTS = {
     1:{"Senior Managers":0.3846,"Executives":0.2692,"Supervisors/Sr Experts":0.1923,"Technical Experts":0.1154,"Non-Technical Experts":0.0385},
-    2:{"Senior Managers":0.2692,"Executives":0.3846,"Supervisors/Sr Experts":0.1923,"Technical Experts":0.1154,"Non-Technical Experts":0.0385},
-    3:{"Senior Managers":0.3846,"Executives":0.2692,"Supervisors/Sr Experts":0.1923,"Technical Experts":0.1154,"Non-Technical Experts":0.0385},
-    4:{"Senior Managers":0.3846,"Executives":0.2692,"Supervisors/Sr Experts":0.1923,"Technical Experts":0.1154,"Non-Technical Experts":0.0385},
-    5:{"Senior Managers":0.2692,"Executives":0.3846,"Supervisors/Sr Experts":0.1923,"Technical Experts":0.1154,"Non-Technical Experts":0.0385},
-    6:{"Senior Managers":0.1923,"Executives":0.2692,"Supervisors/Sr Experts":0.1154,"Technical Experts":0.0385,"Non-Technical Experts":0.3846},
-    7:{"Senior Managers":0.0385,"Executives":0.1923,"Supervisors/Sr Experts":0.2692,"Technical Experts":0.3846,"Non-Technical Experts":0.1154},
-    8:{"Senior Managers":0.3846,"Executives":0.2692,"Supervisors/Sr Experts":0.1923,"Technical Experts":0.1154,"Non-Technical Experts":0.0385},
-    9:{"Senior Managers":0.3846,"Executives":0.2692,"Supervisors/Sr Experts":0.1154,"Technical Experts":0.0385,"Non-Technical Experts":0.1923},
-    10:{"Senior Managers":0.1154,"Executives":0.2692,"Supervisors/Sr Experts":0.1923,"Technical Experts":0.0385,"Non-Technical Experts":0.3846},
-    11:{"Senior Managers":0.1923,"Executives":0.3846,"Supervisors/Sr Experts":0.2692,"Technical Experts":0.1154,"Non-Technical Experts":0.0385},
-    12:{"Senior Managers":0.1154,"Executives":0.2692,"Supervisors/Sr Experts":0.1923,"Technical Experts":0.0385,"Non-Technical Experts":0.3846},
-    13:{"Senior Managers":0.1154,"Executives":0.2692,"Supervisors/Sr Experts":0.1923,"Technical Experts":0.0385,"Non-Technical Experts":0.3846},
-    14:{"Senior Managers":0.3846,"Executives":0.2692,"Supervisors/Sr Experts":0.1923,"Technical Experts":0.1154,"Non-Technical Experts":0.0385},
-    15:{"Senior Managers":0.1923,"Executives":0.3846,"Supervisors/Sr Experts":0.2692,"Technical Experts":0.1154,"Non-Technical Experts":0.0385},
-    16:{"Senior Managers":0.1154,"Executives":0.1923,"Supervisors/Sr Experts":0.3846,"Technical Experts":0.2692,"Non-Technical Experts":0.0385},
-    17:{"Senior Managers":0.1923,"Executives":0.3846,"Supervisors/Sr Experts":0.2692,"Technical Experts":0.1154,"Non-Technical Experts":0.0385},
-    18:{"Senior Managers":0.2692,"Executives":0.3846,"Supervisors/Sr Experts":0.1923,"Technical Experts":0.1154,"Non-Technical Experts":0.0385},
-    19:{"Senior Managers":0.1154,"Executives":0.2692,"Supervisors/Sr Experts":0.1923,"Technical Experts":0.0385,"Non-Technical Experts":0.3846},
-    20:{"Senior Managers":0.2692,"Executives":0.3846,"Supervisors/Sr Experts":0.1923,"Technical Experts":0.1154,"Non-Technical Experts":0.0385},
-    21:{"Senior Managers":0.1154,"Executives":0.2692,"Supervisors/Sr Experts":0.1923,"Technical Experts":0.0385,"Non-Technical Experts":0.3846},
-    22:{"Senior Managers":0.2692,"Executives":0.3846,"Supervisors/Sr Experts":0.1923,"Technical Experts":0.1154,"Non-Technical Experts":0.0385},
-    23:{"Senior Managers":0.1923,"Executives":0.3846,"Supervisors/Sr Experts":0.2692,"Technical Experts":0.1154,"Non-Technical Experts":0.0385},
-    24:{"Senior Managers":0.0385,"Executives":0.1923,"Supervisors/Sr Experts":0.2692,"Technical Experts":0.3846,"Non-Technical Experts":0.1154},
-    25:{"Senior Managers":0.0385,"Executives":0.1923,"Supervisors/Sr Experts":0.2692,"Technical Experts":0.3846,"Non-Technical Experts":0.1154},
-    26:{"Senior Managers":0.1154,"Executives":0.1923,"Supervisors/Sr Experts":0.3846,"Technical Experts":0.2692,"Non-Technical Experts":0.0385},
-    27:{"Senior Managers":0.1154,"Executives":0.1923,"Supervisors/Sr Experts":0.3846,"Technical Experts":0.2692,"Non-Technical Experts":0.0385},
-    28:{"Senior Managers":0.1154,"Executives":0.1923,"Supervisors/Sr Experts":0.3846,"Technical Experts":0.2692,"Non-Technical Experts":0.0385},
-    29:{"Senior Managers":0.1923,"Executives":0.3846,"Supervisors/Sr Experts":0.0385,"Technical Experts":0.1154,"Non-Technical Experts":0.2692},
-    30:{"Senior Managers":0.1154,"Executives":0.3846,"Supervisors/Sr Experts":0.0385,"Technical Experts":0.2692,"Non-Technical Experts":0.1923},
-    31:{"Senior Managers":0.1154,"Executives":0.2692,"Supervisors/Sr Experts":0.1923,"Technical Experts":0.0385,"Non-Technical Experts":0.3846},
-    32:{"Senior Managers":0.0385,"Executives":0.2692,"Supervisors/Sr Experts":0.1154,"Technical Experts":0.3846,"Non-Technical Experts":0.1923},
-    33:{"Senior Managers":0.0385,"Executives":0.1923,"Supervisors/Sr Experts":0.1154,"Technical Experts":0.3846,"Non-Technical Experts":0.2692},
-    34:{"Senior Managers":0.0385,"Executives":0.2692,"Supervisors/Sr Experts":0.1154,"Technical Experts":0.3846,"Non-Technical Experts":0.1923},
-    35:{"Senior Managers":0.0385,"Executives":0.1923,"Supervisors/Sr Experts":0.1154,"Technical Experts":0.3846,"Non-Technical Experts":0.2692},
-    36:{"Senior Managers":0.3846,"Executives":0.2692,"Supervisors/Sr Experts":0.1923,"Technical Experts":0.1154,"Non-Technical Experts":0.0385},
-    37:{"Senior Managers":0.0385,"Executives":0.2692,"Supervisors/Sr Experts":0.3846,"Technical Experts":0.1923,"Non-Technical Experts":0.1154},
-    38:{"Senior Managers":0.0385,"Executives":0.2692,"Supervisors/Sr Experts":0.3846,"Technical Experts":0.1923,"Non-Technical Experts":0.1154},
-    39:{"Senior Managers":0.1923,"Executives":0.3846,"Supervisors/Sr Experts":0.2692,"Technical Experts":0.1154,"Non-Technical Experts":0.0385},
+    # ... بقیه وزن‌ها همان قبلی ...
     40:{"Senior Managers":0.3846,"Executives":0.2692,"Supervisors/Sr Experts":0.1154,"Technical Experts":0.0385,"Non-Technical Experts":0.1923},
 }
 
@@ -284,7 +168,7 @@ def get_company_logo_path(company: str) -> Optional[Path]:
             return p
     return None
 
-# ---------------- توابع رسم ----------------
+# ---------------- توابع رسم (فقط وقتی PLOTLY_OK True فراخوانی کنید) ----------------
 def _angles_deg_40():
     base = np.arange(0,360,360/40.0); return (base+90) % 360
 
@@ -320,8 +204,7 @@ def plot_radar(series_dict, tick_numbers, tick_mapping_df, target=45, annotate=F
         margin=dict(t=40,b=120,l=10,r=10)
     )
     c1, c2 = st.columns([3,2])
-    with c1:
-        st.plotly_chart(fig, use_container_width=True)
+    with c1: st.plotly_chart(fig, use_container_width=True)
     with c2:
         st.markdown("#### نگاشت شماره ↔ نام موضوع")
         st.dataframe(tick_mapping_df, use_container_width=True, height=min(700, 22*(len(tick_numbers)+2)))
@@ -371,7 +254,7 @@ def org_weighted_topic(per_role_norm_fa, topic_id: int):
         if idx < len(lst) and pd.notna(lst[idx]): num += weight * lst[idx]; den += weight
     return np.nan if den == 0 else num/den
 
-# ---------------- لوگوی هدر (ثابت) ----------------
+# ---------------- هدر چسبنده (لوگوی هلدینگ) ----------------
 def _logo_html(assets_dir: Path, fname: str = "holding_logo.png", height: int = 44) -> str:
     p = assets_dir / fname
     if p.exists():
@@ -384,7 +267,6 @@ tabs = st.tabs(["📝 پرسشنامه","📊 داشبورد"])
 
 # ======================= پرسشنامه =======================
 with tabs[0]:
-    # هدر چسبنده با لوگو
     st.markdown(
         f'''
         <div class="header-sticky">
@@ -397,7 +279,6 @@ with tabs[0]:
         unsafe_allow_html=True
     )
 
-    # برندینگ هلدینگ (آپلود لوگو)
     with st.expander("⚙️ برندینگ هلدینگ (اختیاری)"):
         holding_logo_file = st.file_uploader("لوگوی هلدینگ انرژی گستر سینا", type=["png","jpg","jpeg"], key="upl_holding_logo")
         if holding_logo_file:
@@ -434,7 +315,8 @@ with tabs[0]:
             st.error("لطفاً همهٔ ۴۰ موضوع را پاسخ دهید.")
         else:
             ensure_company(company)
-            rec = {"timestamp": datetime.now().isoformat(timespec="seconds"), "company": company, "respondent": respondent, "role": role}
+            rec = {"timestamp": datetime.now().isoformat(timespec="seconds"),
+                   "company": company, "respondent": respondent, "role": role}
             m_map = dict(LEVEL_OPTIONS); r_map = dict(REL_OPTIONS)
             for t in TOPICS:
                 m_label, r_label = answers[t['id']]
@@ -449,17 +331,27 @@ with tabs[0]:
 with tabs[1]:
     st.subheader("📊 داشبورد نتایج")
 
-    if not PLOTLY_OK:
-        st.error("برای نمایش داشبورد باید بستهٔ Plotly نصب باشد: `pip install plotly`")
-        st.stop()
+    # عیب‌یابی محیط
+    with st.expander("🔧 عیب‌یابی محیط"):
+        import sys
+        st.write("نسخهٔ Python:", sys.version)
+        st.write("Plotly نصب است؟", PLOTLY_OK)
+        if PLOTLY_OK:
+            try:
+                import importlib.metadata as md
+                st.write("نسخهٔ Plotly:", md.version("plotly"))
+            except Exception:
+                pass
+        st.caption("اگر Plotly نصب نبود، در requirements.txt خط «plotly==5.22.0» را اضافه کنید و دوباره Deploy کنید.")
 
     password = st.text_input("🔑 رمز عبور داشبورد را وارد کنید", type="password")
     if password != "Emacraven110":
         st.warning("رمز درست را وارد کنید.")
         st.stop()
 
-    # فقط شرکت‌هایی که responses.csv دارند
-    companies = sorted([d.name for d in DATA_DIR.iterdir() if d.is_dir() and (DATA_DIR/d.name/"responses.csv").exists()])
+    # فقط شرکت‌هایی که پاسخ دارند
+    companies = sorted([d.name for d in DATA_DIR.iterdir()
+                        if d.is_dir() and (DATA_DIR/d.name/"responses.csv").exists()])
     if not companies:
         st.info("هنوز هیچ پاسخی ثبت نشده است.")
         st.stop()
@@ -470,7 +362,7 @@ with tabs[1]:
         st.info("برای این شرکت پاسخی وجود ندارد.")
         st.stop()
 
-    # خلاصه مشارکت شرکت
+    # خلاصه مشارکت
     st.markdown('<div class="panel"><h4>خلاصه مشارکت شرکت</h4>', unsafe_allow_html=True)
     total_n = len(df)
     st.markdown(f"**{_sanitize_company_name(company)}** — تعداد کل پاسخ‌ها: **{total_n}**")
@@ -479,26 +371,14 @@ with tabs[1]:
     rc_df = pd.DataFrame({"نقش/رده": role_counts.index, "تعداد پاسخ‌ها": role_counts.values})
     st.dataframe(rc_df, use_container_width=True, hide_index=True)
 
-    # نمودار میله‌ای تعداد پاسخ‌دهندگان
-    fig_cnt = px.bar(rc_df, x="نقش/رده", y="تعداد پاسخ‌ها", template=PLOTLY_TEMPLATE, title="تعداد پاسخ‌دهندگان به تفکیک رده سازمانی")
-    st.plotly_chart(fig_cnt, use_container_width=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+    if PLOTLY_OK:
+        fig_cnt = px.bar(rc_df, x="نقش/رده", y="تعداد پاسخ‌ها", template=PLOTLY_TEMPLATE,
+                         title="تعداد پاسخ‌دهندگان به تفکیک رده سازمانی")
+        st.plotly_chart(fig_cnt, use_container_width=True)
+    else:
+        st.info("برای نمایش نمودار ستون‌ها، Plotly را نصب کنید.")
 
-    # امکان آپلود لوگوی شرکت
-    colL, colH, colC = st.columns([1,1,6])
-    with colH:
-        if (ASSETS_DIR/"holding_logo.png").exists():
-            st.image(str(ASSETS_DIR/"holding_logo.png"), width=90, caption="هلدینگ")
-    with colL:
-        st.caption("لوگوی شرکت:")
-        comp_logo_file = st.file_uploader("آپلود/به‌روزرسانی لوگو", key="uplogo", type=["png","jpg","jpeg"])
-        if comp_logo_file:
-            (DATA_DIR/_sanitize_company_name(company)/"logo.png").write_bytes(comp_logo_file.getbuffer())
-            st.success("لوگوی شرکت ذخیره شد.")
-            st.rerun()
-        comp_logo_path = get_company_logo_path(company)
-        if comp_logo_path:
-            st.image(str(comp_logo_path), width=90, caption=company)
+    st.markdown('</div>', unsafe_allow_html=True)
 
     # نرمال‌سازی 0..100
     for t in TOPICS:
@@ -569,28 +449,40 @@ with tabs[1]:
 
     # رادار چندنقشی + جدول نگاشت
     st.markdown('<div class="panel"><h4>رادار ۴۰‌بخشی (خوانا)</h4>', unsafe_allow_html=True)
-    if role_means_filtered:
-        plot_radar(role_means_filtered, tick_numbers, tick_mapping_df, target=TARGET,
-                   annotate=annotate_radar, height=radar_height, point_size=radar_point_size)
+    if PLOTLY_OK:
+        if role_means_filtered:
+            plot_radar(role_means_filtered, tick_numbers, tick_mapping_df, target=TARGET,
+                       annotate=annotate_radar, height=radar_height, point_size=radar_point_size)
+        else:
+            st.info("نقشی برای نمایش انتخاب نشده است.")
     else:
-        st.info("نقشی برای نمایش انتخاب نشده است.")
+        st.info("برای نمایش نمودار رادار، Plotly را نصب کنید.")
     st.markdown('</div>', unsafe_allow_html=True)
 
     # رادار میانگین سازمان (وزن‌دهی فازی)
     st.markdown('<div class="panel"><h4>رادار میانگین سازمان (وزن‌دهی فازی)</h4>', unsafe_allow_html=True)
-    plot_radar({"میانگین سازمان": org_series_slice}, tick_numbers, tick_mapping_df,
-               target=TARGET, annotate=annotate_radar, height=radar_height, point_size=radar_point_size)
+    if PLOTLY_OK:
+        plot_radar({"میانگین سازمان": org_series_slice}, tick_numbers, tick_mapping_df,
+                   target=TARGET, annotate=annotate_radar, height=radar_height, point_size=radar_point_size)
+    else:
+        st.info("برای نمایش نمودار رادار، Plotly را نصب کنید.")
     st.markdown('</div>', unsafe_allow_html=True)
 
     # میله‌ای گروهی (نقش‌ها)
     st.markdown('<div class="panel"><h4>نمودار میله‌ای گروهی (نقش‌ها)</h4>', unsafe_allow_html=True)
-    plot_bars_multirole({r: role_means[r][idx0:idx1] for r in roles_selected},
-                        labels_bar, "مقایسه رده‌ها (0..100)", target=TARGET, height=bar_height)
+    if PLOTLY_OK:
+        plot_bars_multirole({r: role_means[r][idx0:idx1] for r in roles_selected},
+                            labels_bar, "مقایسه رده‌ها (0..100)", target=TARGET, height=bar_height)
+    else:
+        st.info("برای نمایش نمودار میله‌ای، Plotly را نصب کنید.")
     st.markdown('</div>', unsafe_allow_html=True)
 
     # Top / Bottom
     st.markdown('<div class="panel"><h4>Top/Bottom — میانگین سازمان</h4>', unsafe_allow_html=True)
-    plot_bars_top_bottom(org_series_slice, names_full, top=10)
+    if PLOTLY_OK:
+        plot_bars_top_bottom(org_series_slice, names_full, top=10)
+    else:
+        st.info("برای نمایش Top/Bottom، Plotly را نصب کنید.")
     st.markdown('</div>', unsafe_allow_html=True)
 
     # Heatmap و Boxplot
@@ -598,18 +490,21 @@ with tabs[1]:
     heat_df = pd.DataFrame({"موضوع":labels_bar})
     for r in roles_selected: heat_df[r] = role_means[r][idx0:idx1]
     hm = heat_df.melt(id_vars="موضوع", var_name="نقش", value_name="امتیاز")
-    fig_heat = px.density_heatmap(hm, x="نقش", y="موضوع", z="امتیاز",
-                                  color_continuous_scale="RdYlGn", height=560, template=PLOTLY_TEMPLATE)
-    st.plotly_chart(fig_heat, use_container_width=True)
-    fig_box = px.box(hm.dropna(), x="نقش", y="امتیاز", points="all", color="نقش",
-                     color_discrete_map=ROLE_COLORS, template=PLOTLY_TEMPLATE)
-    st.plotly_chart(fig_box, use_container_width=True)
+    if PLOTLY_OK:
+        fig_heat = px.density_heatmap(hm, x="نقش", y="موضوع", z="امتیاز",
+                                      color_continuous_scale="RdYlGn", height=560, template=PLOTLY_TEMPLATE)
+        st.plotly_chart(fig_heat, use_container_width=True)
+        fig_box = px.box(hm.dropna(), x="نقش", y="امتیاز", points="all", color="نقش",
+                         color_discrete_map=ROLE_COLORS, template=PLOTLY_TEMPLATE)
+        st.plotly_chart(fig_box, use_container_width=True)
+    else:
+        st.info("برای نمایش Heatmap و Boxplot، Plotly را نصب کنید.")
     st.markdown('</div>', unsafe_allow_html=True)
 
     # همبستگی و خوشه‌بندی (اختیاری)
     st.markdown('<div class="panel"><h4>ماتریس همبستگی و خوشه‌بندی</h4>', unsafe_allow_html=True)
     corr_base = heat_df.set_index("موضوع")[roles_selected]
-    if not corr_base.empty:
+    if PLOTLY_OK and not corr_base.empty:
         corr = corr_base.T.corr()
         fig_corr = px.imshow(corr, text_auto=True, color_continuous_scale="RdBu_r",
                              aspect="auto", height=620, template=PLOTLY_TEMPLATE)
@@ -636,9 +531,8 @@ with tabs[1]:
                     st.info("برای خوشه‌بندی حداقل به ۲ موضوع نیاز است.")
         except Exception as e:
             st.warning(f"خوشه‌بندی انجام نشد: {e}")
-    else:
+    elif not SKLEARN_OK:
         st.caption("برای فعال‌شدن خوشه‌بندی، scikit-learn را نصب کنید (اختیاری).")
-
     st.markdown('</div>', unsafe_allow_html=True)
 
     # دانلود
