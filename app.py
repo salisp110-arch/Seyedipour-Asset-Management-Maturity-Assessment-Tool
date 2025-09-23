@@ -9,10 +9,7 @@ from datetime import datetime
 from typing import Optional
 
 # ---------------- Page config ----------------
-st.set_page_config(
-    page_title="پرسشنامه و داشبورد تعیین سطح بلوغ سازمان‌ها در مدیریت دارایی فیزیکی",
-    layout="wide"
-)
+st.set_page_config(page_title="پرسشنامه و داشبورد تعیین سطح بلوغ سازمان‌ها در مدیریت دارایی فیزیکی", layout="wide")
 
 # ---------------- Plotly (برای داشبورد لازم) ----------------
 try:
@@ -46,50 +43,75 @@ def _safe_dir(p: Path) -> Path:
 DATA_DIR   = _safe_dir(BASE / "data")
 ASSETS_DIR = _safe_dir(BASE / "assets")
 
-# ---------------- CSS/Font: تزریق امن بدون نمایش متن خام ----------------
+# ---------------- CSS/Font: تزریق مطمئن (هر رندر) ----------------
 def inject_css_safe():
-    if st.session_state.get("_css_ok"):
-        return
-    css = """
-:root{--brand:#16325c;--accent:#0f3b8f;--border:#e8eef7;--font:Vazir,Tahoma,Arial,sans-serif}
-html,body,*{font-family:var(--font)!important;direction:rtl}
-.block-container{padding-top:.6rem;padding-bottom:3rem}
-h1,h2,h3,h4{color:var(--brand)}
-/* نوار ثابت بالا با آفست امن */
-.app-topbar{position:sticky;top:48px;z-index:999;background:#ffffffd9;backdrop-filter:blur(6px);
-  border:1px solid #eef2f7;border-radius:14px;padding:10px 14px;margin:0 0 12px 0;box-shadow:0 6px 18px rgba(0,0,0,.06)}
-.app-topbar .wrap{display:flex;align-items:center;gap:14px}
-.app-topbar .title{font-weight:800;color:var(--brand);font-size:18px;margin:0}
+    # 1) تلاش برای فونت محلی (assets/Vazir.woff2). اگر نبود، از CDN استفاده می‌کنیم.
+    local_font = ASSETS_DIR / "Vazir.woff2"
+    if local_font.exists():
+        b64font = base64.b64encode(local_font.read_bytes()).decode()
+        font_face = f"""
+@font-face {{
+  font-family: 'Vazir';
+  src: url(data:font/woff2;base64,{b64font}) format('woff2');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}}
+"""
+    else:
+        # اگر CDN ایران‌هاست مسدود باشد فقط به فونت سیستم می‌افتیم ولی RTL می‌ماند.
+        font_face = """
+@font-face {
+  font-family: 'Vazir';
+  src: url('https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/Vazir.woff2') format('woff2');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+"""
+
+    css = f"""
+<style>
+{font_face}
+:root{{--brand:#16325c;--accent:#0f3b8f;--border:#e8eef7}}
+html,body,*{{font-family:'Vazir',Tahoma,Arial,sans-serif !important; direction:rtl}}
+.block-container{{padding-top:.6rem;padding-bottom:3rem}}
+h1,h2,h3,h4{{color:var(--brand)}}
+
+/* هدر چسبنده */
+.header-sticky{position:sticky;top:0;z-index:50;background:#ffffffcc;backdrop-filter:blur(6px);
+  border-bottom:1px solid #eef2f7;padding:10px 12px;margin:-10px -1rem 10px -1rem;}
+.header-sticky .wrap{{display:flex;align-items:center;gap:12px}}
+.header-sticky .title{{font-weight:800;color:var(--brand);font-size:18px;margin:0}}
+.header-spacer{{height:10px}} /* فاصلهٔ کوچک زیر هدر */
+
 /* کارت سوال */
-.question-card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin:10px 0 16px;box-shadow:0 6px 16px rgba(36,74,143,.06),inset 0 1px 0 rgba(255,255,255,.6)}
-.q-head{font-weight:800;color:var(--brand);font-size:15px;margin-bottom:8px}
-.q-desc{color:#222;font-size:14px;line-height:1.9;margin-bottom:10px;text-align:justify}
-.q-num{display:inline-block;background:#e8f0fe;color:var(--brand);font-weight:700;border-radius:8px;padding:2px 8px;margin-left:6px;font-size:12px}
-.q-question{color:var(--accent);font-weight:700;margin:.2rem 0 .4rem}
-/* KPI */
-.kpi{border-radius:14px;padding:16px 18px;border:1px solid #e6ecf5;background:linear-gradient(180deg,#fff 0%,#f6f9ff 100%);
-  box-shadow:0 8px 20px rgba(0,0,0,.05);min-height:96px}
-.kpi .title{color:#456;font-size:13px;margin-bottom:6px}
-.kpi .value{color:var(--accent);font-size:22px;font-weight:800}
-.kpi .sub{color:#6b7c93;font-size:12px}
-/* پنل */
-.panel{background:linear-gradient(180deg,#f2f7ff 0%,#eaf3ff 100%);border:1px solid #d7e6ff;border-radius:16px;padding:16px 18px;margin:12px 0 18px 0;
-  box-shadow:0 10px 24px rgba(31,79,176,.1),inset 0 1px 0 rgba(255,255,255,.8)}
-.panel h3,.panel h4{margin-top:0;color:#17407a}
-/* جدول کنار رادار */
-.mapping table{font-size:12px}
-.mapping .row_heading,.mapping .blank{display:none}
-/* تب‌ها RTL */
-.stTabs [role=tab]{direction:rtl}
+.question-card{{background:#fff;border:1px solid var(--border);border-radius:14px;padding:16px 18px;margin:10px 0 16px;
+  box-shadow:0 6px 16px rgba(36,74,143,.06), inset 0 1px 0 rgba(255,255,255,.6)}}
+.q-head{{font-weight:800;color:var(--brand);font-size:15px;margin-bottom:8px}}
+.q-desc{{color:#222;font-size:14px;line-height:1.9;margin-bottom:10px;text-align:justify}}
+.q-num{{display:inline-block;background:#e8f0fe;color:var(--brand);font-weight:700;border-radius:8px;padding:2px 8px;margin-left:6px;font-size:12px}}
+.q-question{{color:var(--accent);font-weight:700;margin:.2rem 0 .4rem}}
+
+/* KPI / Panel */
+.kpi{{border-radius:14px;padding:16px 18px;border:1px solid #e6ecf5;background:linear-gradient(180deg,#fff 0%,#f6f9ff 100%);
+  box-shadow:0 8px 20px rgba(0,0,0,.05);min-height:96px}}
+.kpi .title{{color:#456;font-size:13px;margin-bottom:6px}}
+.kpi .value{{color:var(--accent);font-size:22px;font-weight:800}}
+.kpi .sub{{color:#6b7c93;font-size:12px}}
+
+.panel{{background:linear-gradient(180deg,#f2f7ff 0%,#eaf3ff 100%);border:1px solid #d7e6ff;border-radius:16px;padding:16px 18px;margin:12px 0 18px 0;
+  box-shadow:0 10px 24px rgba(31,79,176,.10), inset 0 1px 0 rgba(255,255,255,.8)}}
+.panel h3,.panel h4{{margin-top:0;color:#17407a}}
+
+.mapping table{{font-size:12px}}
+.mapping .row_heading,.mapping .blank{{display:none}}
+
+/* تب‌ها راست‌به‌چپ */
+.stTabs [role="tab"]{{direction: rtl}}
+</style>
 """
-    b64css = base64.b64encode(css.encode("utf-8")).decode()
-    html = f"""
-<link rel="stylesheet"
-      href="https://cdn.jsdelivr.net/gh/rastikerdar/vazir-font@v30.1.0/dist/font-face.css">
-<link rel="stylesheet" href="data:text/css;base64,{b64css}">
-"""
-    st.markdown(html, unsafe_allow_html=True)
-    st.session_state["_css_ok"] = True
+    st.markdown(css, unsafe_allow_html=True)
 
 inject_css_safe()
 
@@ -101,7 +123,7 @@ TOPICS_PATH = BASE/"topics.json"
 EMBEDDED_TOPICS = [
     {"id":1,"name":"هدف و زمینه (Purpose & Context)","desc":"Purpose و Context نقطه شروع سیستم مدیریت دارایی هستند. Purpose همان مأموریت و ارزش‌هایی است که سازمان برای ذی‌نفعان خلق می‌کند. Context محیطی است که سازمان در آن فعالیت دارد: شامل شرایط اجتماعی، سیاسی، اقتصادی، فناورانه و داخلی. این دو باید در SAMP و اهداف مدیریت دارایی منعکس شوند تا اقدامات سازمان همسو با مأموریت اصلی باشد. ابزارهایی مانند SWOT و PESTLE برای تحلیل محیط و شناسایی ریسک‌ها و فرصت‌ها استفاده می‌شوند. سازمان‌هایی که Purpose و Context را به‌طور منظم بازنگری می‌کنند، بهتر می‌توانند منابع خود را بهینه کنند، ریسک‌ها را کاهش دهند و فرصت‌ها را شناسایی نمایند."},
     {"id":2,"name":"مدیریت ذی‌نفعان","desc":"مدیریت ذی‌نفعان به معنای داشتن یک رویکرد ساختاریافته و مستند برای شناسایی، درگیر کردن و مدیریت نیازها و انتظارات افرادی است که می‌توانند بر سازمان اثر بگذارند یا از آن اثر بپذیرند. این ذی‌نفعان می‌توانند داخلی یا خارجی باشند. هدف، ایجاد شفافیت و اطمینان از این است که ارزش‌های مورد انتظار ذی‌نفعان در فعالیت‌های مدیریت دارایی منعکس شود. ابزارهایی مانند Stakeholder Mapping و ماتریس نفوذ-علاقه به سنجش اهمیت و تعریف راهکار ارتباط مؤثر کمک می‌کنند. پایش مستمر و سازوکارهای رسمی مشارکت، مدیریت ریسک و مشروعیت اجتماعی را تقویت می‌کند."},
-    {"id":3,"name":"هزینه‌یابی و ارزش‌گذاری دارایی","desc":"هزینه‌یابی دارایی شامل شناسایی و ثبت کل هزینه‌های سرمایه‌ای (Capex) و عملیاتی (Opex) در طول چرخه عمر است. ارزش‌گذاری دارایی فرآیند سنجش ارزش مالی دارایی‌ها طبق استانداردهای حسابداری است. این دو حوزه برای تصمیم‌گیری سرمایه‌گذاری و گزارش‌دهی مالی حیاتی‌اند. ابزارهایی مانند NPV، IRR، Payback و LCC به‌کار می‌روند."},
+    {"id":3,"name":"हزینه‌یابی و ارزش‌گذاری دارایی","desc":"هزینه‌یابی دارایی شامل شناسایی و ثبت کل هزینه‌های سرمایه‌ای (Capex) و عملیاتی (Opex) در طول چرخه عمر است. ارزش‌گذاری دارایی فرآیند سنجش ارزش مالی دارایی‌ها طبق استانداردهای حسابداری است. این دو حوزه برای تصمیم‌گیری سرمایه‌گذاری و گزارش‌دهی مالی حیاتی‌اند. ابزارهایی مانند NPV، IRR، Payback و LCC به‌کار می‌روند."},
     {"id":4,"name":"خط مشی مدیریت دارایی","desc":"خط مشی مدیریت دارایی سندی رسمی است که تعهد سازمان به مدیریت دارایی را بیان می‌کند و با چشم‌انداز، مأموریت و اهداف کلان همسو می‌شود. این سیاست چارچوبی جهت‌دار برای هم‌سویی برنامه‌های استراتژیک و اهداف دارایی فراهم می‌کند و معمولاً بخشی از SAMP است و با سایر خط‌مشی‌های کلان یکپارچه می‌شود. سازمان‌های پیشرو این سیاست را به‌طور منظم بازبینی و به کارکنان ابلاغ می‌کنند."},
     {"id":5,"name":"سیستم مدیریت دارایی (AMS)","desc":"سیستم مدیریت دارایی مجموعه‌ای از عناصر مرتبط برای ایجاد، به‌روزرسانی و پایدارسازی سیاست‌ها، اهداف و فرآیندهای مدیریت دارایی است و باید با سایر سیستم‌های مدیریتی مانند ISO 9001/14001/45001 همسو باشد. این سیستم شامل فرآیندهایی برای ارزیابی اثربخشی، شناسایی عدم انطباق‌ها و اجرای بهبود مستمر است. ISO 55001 چارچوب طراحی و ممیزی ارائه می‌دهد."},
     {"id":6,"name":"اطمینان و ممیزی","desc":"اطمینان و ممیزی فرآیندهای ساختاریافته‌ای برای ارزیابی اثربخشی دارایی‌ها، فعالیت‌های مدیریت دارایی و خود AMS هستند. الگوی «سه خط دفاع» معمولاً برای تفکیک مسئولیت‌های عملیاتی، کنترل ریسک و ممیزی مستقل استفاده می‌شود. ممیزی‌های داخلی و خارجی، ورودی‌های کلیدی برای بازنگری مدیریت و بهبود AMS محسوب می‌شوند."},
@@ -146,7 +168,7 @@ TOPICS = json.loads(TOPICS_PATH.read_text(encoding="utf-8"))
 if len(TOPICS) != 40:
     st.warning("⚠️ تعداد موضوعات باید دقیقاً ۴۰ باشد.")
 
-# ---------------- نقش‌ها و رنگ‌ها و وزن‌ها ----------------
+# ---------------- نقش‌ها، رنگ‌ها، وزن‌ها ----------------
 ROLES = ["مدیران ارشد","مدیران اجرایی","سرپرستان / خبرگان","متخصصان فنی","متخصصان غیر فنی"]
 ROLE_COLORS = {
     "مدیران ارشد":"#d62728","مدیران اجرایی":"#1f77b4","سرپرستان / خبرگان":"#2ca02c",
@@ -329,25 +351,12 @@ def org_weighted_topic(per_role_norm_fa, topic_id: int):
     return np.nan if den == 0 else num/den
 
 # ---------------- هدر/لوگو ----------------
-def _logo_html(assets_dir: Path, fname: str = "holding_logo.png", height: int = 96) -> str:
+def _logo_html(assets_dir: Path, fname: str = "holding_logo.png", height: int = 70) -> str:
     p = assets_dir / fname
     if p.exists():
         b64 = base64.b64encode(p.read_bytes()).decode()
         return f'<img src="data:image/png;base64,{b64}" height="{height}" alt="logo">'
     return ""
-
-def render_topbar():
-    st.markdown(
-        f"""
-<div class="app-topbar">
-  <div class="wrap">
-    {_logo_html(ASSETS_DIR, "holding_logo.png", 96)}
-    <div class="title">پرسشنامه و داشبورد تعیین سطح بلوغ سازمان‌ها در مدیریت دارایی فیزیکی</div>
-  </div>
-</div>
-""",
-        unsafe_allow_html=True
-    )
 
 # ---------------- ریست فرم پس از ثبت ----------------
 def reset_survey_state():
@@ -362,17 +371,30 @@ tabs = st.tabs(["📝 پرسشنامه","📊 داشبورد"])
 
 # ======================= پرسشنامه =======================
 with tabs[0]:
-    render_topbar()
+    st.markdown(
+        f'''
+        <div class="header-sticky">
+          <div class="wrap">
+            {_logo_html(ASSETS_DIR, "holding_logo.png", 70)}
+            <div class="title">پرسشنامه و داشبورد تعیین سطح بلوغ سازمان‌ها در مدیریت دارایی فیزیکی</div>
+          </div>
+        </div>
+        <div class="header-spacer"></div>
+        ''',
+        unsafe_allow_html=True
+    )
 
     if st.session_state.pop("submitted_ok", False):
         st.success("✅ پاسخ شما با موفقیت ذخیره شد و فرم ریست شد.")
 
-    with st.expander("⚙️ برندینگ هلدینگ (اختیاری)"):
-        holding_logo_file = st.file_uploader("لوگوی هلدینگ انرژی گستر سینا", type=["png","jpg","jpeg"], key="upl_holding_logo")
+    with st.expander("⚙️ برندینگ (اختیاری)"):
+        holding_logo_file = st.file_uploader("لوگوی بالای صفحه (holding_logo.png)", type=["png","jpg","jpeg"], key="upl_holding_logo")
         if holding_logo_file:
             (ASSETS_DIR/"holding_logo.png").write_bytes(holding_logo_file.getbuffer())
-            st.success("لوگوی هلدینگ ذخیره شد.")
+            st.success("لوگو ذخیره شد.")
             st.rerun()
+
+        st.caption("برای اطمینان از نمایش فونت وزیر حتی بدون اینترنت، فایل Vazir.woff2 را در assets/ قرار دهید.")
 
     st.info("برای هر موضوع ابتدا توضیح فارسی آن را بخوانید، سپس با توجه به دو پرسش ذیل هر موضوع، یکی از گزینه‌های زیر هر پرسش را انتخاب بفرمایید.")
 
@@ -422,19 +444,23 @@ with tabs[0]:
 
 # ======================= داشبورد =======================
 with tabs[1]:
-    render_topbar()
-
     st.subheader("📊 داشبورد نتایج")
 
     if not PLOTLY_OK:
         st.error("برای نمایش داشبورد باید بستهٔ Plotly نصب باشد: `pip install plotly`")
         st.stop()
 
-    password = st.text_input("🔑 رمز عبور داشبورد را وارد کنید", type="password")
-    if password != "Emacraven110":
+    # رمز از secrets یا محیط، و حذف فاصله‌های ناخواسته
+    DASHBOARD_PASSWORD = (
+        st.secrets.get("DASHBOARD_PASSWORD", None)
+        if hasattr(st, "secrets") else None
+    ) or os.getenv("DASHBOARD_PASSWORD", "Emacraven110")
+    password = st.text_input("🔑 رمز عبور داشبورد را وارد کنید", type="password").strip()
+    if password != str(DASHBOARD_PASSWORD).strip():
         st.warning("رمز درست را وارد کنید.")
         st.stop()
 
+    # فقط شرکت‌هایی که responses.csv دارند
     companies = sorted([d.name for d in DATA_DIR.iterdir() if d.is_dir() and (DATA_DIR/d.name/"responses.csv").exists()])
     if not companies:
         st.info("هنوز هیچ پاسخی ثبت نشده است.")
@@ -446,6 +472,7 @@ with tabs[1]:
         st.info("برای این شرکت پاسخی وجود ندارد.")
         st.stop()
 
+    # خلاصه مشارکت
     st.markdown('<div class="panel"><h4>خلاصه مشارکت شرکت</h4>', unsafe_allow_html=True)
     total_n = len(df)
     st.markdown(f"**{_sanitize_company_name(company)}** — تعداد کل پاسخ‌ها: **{total_n}**")
@@ -457,10 +484,11 @@ with tabs[1]:
     st.plotly_chart(fig_cnt, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
+    # لوگوها
     colL, colH, colC = st.columns([1,1,6])
     with colH:
         if (ASSETS_DIR/"holding_logo.png").exists():
-            st.image(str(ASSETS_DIR/"holding_logo.png"), width=90, caption="هلدینگ")
+            st.image(str(ASSETS_DIR/"holding_logo.png"), width=120, caption="لوگوی بالای صفحات")
     with colL:
         st.caption("لوگوی شرکت:")
         comp_logo_file = st.file_uploader("آپلود/به‌روزرسانی لوگو", key="uplogo", type=["png","jpg","jpeg"])
@@ -470,21 +498,25 @@ with tabs[1]:
             st.rerun()
         comp_logo_path = get_company_logo_path(company)
         if comp_logo_path:
-            st.image(str(comp_logo_path), width=90, caption=company)
+            st.image(str(comp_logo_path), width=120, caption=company)
 
+    # نرمال‌سازی 0..100
     for t in TOPICS:
         c = f"t{t['id']}_adj"
         df[c] = pd.to_numeric(df[c], errors="coerce")
         df[c] = df[c].apply(lambda x: (x/40)*100 if pd.notna(x) else np.nan)
 
+    # میانگین نقش‌ها
     role_means = {}
     for r in ROLES:
         sub = df[df["role"]==r]
         role_means[r] = [sub[f"t{t['id']}_adj"].mean() if not sub.empty else np.nan for t in TOPICS]
 
+    # میانگین سازمان (فازی)
     per_role_norm_fa = {r: role_means[r] for r in ROLES}
     org_series = [org_weighted_topic(per_role_norm_fa, t["id"]) for t in TOPICS]
 
+    # KPI ها
     st.markdown('<div class="panel">', unsafe_allow_html=True)
     nanmean_org = np.nanmean(org_series)
     org_avg = float(nanmean_org) if np.isfinite(nanmean_org) else 0.0
@@ -510,6 +542,7 @@ with tabs[1]:
     <div class="value">{worst_label}</div><div class="sub">میانگین ساده نقش‌ها</div></div>""", unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
+    # فیلترها/تنظیمات نمایش
     st.markdown('<div class="panel"><h4>فیلترها و تنظیمات نمایش</h4>', unsafe_allow_html=True)
     annotate_radar = st.checkbox("نمایش اعداد روی نقاط رادار", value=False)
     col_sz1, col_sz2 = st.columns(2)
@@ -533,6 +566,7 @@ with tabs[1]:
     org_series_slice = org_series[idx0:idx1]
     st.markdown('</div>', unsafe_allow_html=True)
 
+    # نمودارها
     st.markdown('<div class="panel"><h4>رادار ۴۰‌بخشی (خوانا)</h4>', unsafe_allow_html=True)
     if role_means_filtered:
         plot_radar(role_means_filtered, tick_numbers, tick_mapping_df, target=TARGET,
