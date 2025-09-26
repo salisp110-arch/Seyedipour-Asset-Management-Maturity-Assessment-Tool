@@ -170,6 +170,17 @@ if len(TOPICS) != 40:
 
 # ---------------- نقش‌ها، رنگ‌ها، وزن‌ها ----------------
 ROLES = ["مدیران ارشد","مدیران اجرایی","سرپرستان / خبرگان","متخصصان فنی","متخصصان غیر فنی"]
+# --- شرکت‌های پیش‌فرض برای انتخاب ---
+COMPANY_CHOICES = [
+    "سینا (فقط برای کارکنان هلدینگ)",
+    "حفاری شمال",
+    "پایندان",
+    "پدکس",
+    "بهران",
+    "دوده فام",
+    "ایران تایر",
+    "قطران",
+]
 ROLE_COLORS = {
     "مدیران ارشد":"#d62728","مدیران اجرایی":"#1f77b4","سرپرستان / خبرگان":"#2ca02c",
     "متخصصان فنی":"#ff7f0e","متخصصان غیر فنی":"#9467bd","میانگین سازمان":"#111"
@@ -363,8 +374,8 @@ def reset_survey_state():
     for t in TOPICS:
         st.session_state.pop(f"mat_{t['id']}", None)
         st.session_state.pop(f"rel_{t['id']}", None)
-    for k in ["company_input", "respondent_input", "role_select"]:
-        st.session_state.pop(k, None)
+   for k in ["company_select", "company_input", "respondent_input", "role_select"]:
+    st.session_state.pop(k, None)
 
 # ---------------- تب‌ها ----------------
 tabs = st.tabs(["📝 پرسشنامه","📊 داشبورد"])
@@ -399,7 +410,15 @@ with tabs[0]:
     st.info("برای هر موضوع ابتدا توضیح فارسی آن را بخوانید، سپس با توجه به دو پرسش ذیل هر موضوع، یکی از گزینه‌های زیر هر پرسش را انتخاب بفرمایید.")
 
     with st.form("survey_form", clear_on_submit=False):
-        company = st.text_input("نام شرکت", key="company_input")
+        company = st.selectbox(
+    "نام شرکت",
+    ["— انتخاب شرکت —"] + COMPANY_CHOICES,
+    index=0,
+    key="company_select",
+)
+# اگر هنوز چیزی انتخاب نشده باشد، برای اعتبارسنجی خالی‌اش می‌کنیم
+if company == "— انتخاب شرکت —":
+    company = ""
         respondent = st.text_input("نام و نام خانوادگی (اختیاری)", key="respondent_input")
         role = st.selectbox("نقش / رده سازمانی", ROLES, key="role_select")
 
@@ -461,7 +480,7 @@ with tabs[1]:
         st.stop()
 
     # فقط شرکت‌هایی که responses.csv دارند
-    companies = sorted([d.name for d in DATA_DIR.iterdir() if d.is_dir() and (DATA_DIR/d.name/"responses.csv").exists()])
+    companies = [c for c in COMPANY_CHOICES if (DATA_DIR / _sanitize_company_name(c) / "responses.csv").exists()]
     if not companies:
         st.info("هنوز هیچ پاسخی ثبت نشده است.")
         st.stop()
@@ -641,3 +660,4 @@ with tabs[1]:
                        file_name=f"{_sanitize_company_name(company)}_responses.csv", mime="text/csv")
     st.caption("برای دانلود تصویر نمودارها، می‌توانید بستهٔ اختیاری `kaleido` را نصب کنید.")
     st.markdown('</div>', unsafe_allow_html=True)
+
